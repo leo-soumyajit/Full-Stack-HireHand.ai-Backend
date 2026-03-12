@@ -3,12 +3,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from database import init_db
-from routers import auth, positions, candidates, psychometric
+from routers import auth, positions, candidates, psychometric, resume_screen, schedules
 
 app = FastAPI(
     title="HireHand AI Backend",
-    description="Production-ready FastAPI backend — EOS-IA Psychometric + Positions + Candidates + Auth",
-    version="3.0.0"
+    description="Production-ready FastAPI backend — EOS-IA Psychometric + AI Resume Screening + Positions + Candidates + Auth",
+    version="3.1.0"
 )
 
 app.add_middleware(
@@ -36,10 +36,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     tc = traceback.format_exc()
     print("CRASH:", str(exc))
     print(tc)
+    # NOTE: Do NOT manually set CORS headers here.
+    # CORSMiddleware wraps the entire app and handles CORS on ALL responses
+    # (including error responses). Adding it here creates duplicate headers
+    # which Chrome blocks as a CORS violation → net::ERR_FAILED.
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error", "error": str(exc)},
-        headers={"Access-Control-Allow-Origin": "*"},
     )
 
 
@@ -48,8 +51,10 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(positions.router, prefix="/api/positions", tags=["Positions"])
 app.include_router(candidates.router, prefix="/api/positions", tags=["Candidates"])
 app.include_router(psychometric.router, prefix="/api/psychometric", tags=["EOS-IA Psychometric"])
+app.include_router(resume_screen.router, prefix="/api", tags=["AI Resume Screening"])
+app.include_router(schedules.router, prefix="/api/schedules", tags=["Schedules"])
 
 
 @app.get("/")
 def read_root():
-    return {"message": "HireHand AI API v3.0 — EOS-IA Psychometric Intelligence 🧠🚀"}
+    return {"message": "HireHand AI API v3.1 — EOS-IA Psychometric + AI Resume Screening 🧠🚀"}

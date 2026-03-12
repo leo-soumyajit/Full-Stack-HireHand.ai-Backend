@@ -18,6 +18,9 @@ psychometric_profiles_collection = database.get_collection("psychometric_profile
 psychometric_scores_collection = database.get_collection("psychometric_scores")
 psychometric_reports_collection = database.get_collection("psychometric_reports")
 
+# Schedules Collection
+schedules_collection = database.get_collection("schedules")
+
 
 async def init_db():
     """Create all indexes on startup for O(1) / low-latency queries."""
@@ -42,3 +45,7 @@ async def init_db():
     await psychometric_reports_collection.create_index(
         [("candidate_id", 1), ("user_id", 1)], unique=True
     )
+
+    # Schedules
+    await schedules_collection.create_index([("user_id", 1), ("scheduled_at", 1)])
+    await schedules_collection.create_index([("candidate_id", 1)])

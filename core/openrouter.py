@@ -163,3 +163,76 @@ TRAIT DESCRIPTIONS:
 Generate the Psychometric Fitment Report."""
 
     return await _call_llm(system_prompt, user_prompt)
+
+
+async def analyze_resume(
+    resume_text: str,
+    jd_purpose: str,
+    jd_responsibilities: list,
+    jd_experience: list,
+    role_title: str,
+    level: str,
+    business_unit: str,
+) -> dict:
+    """
+    AI Resume Screening — analyzes a resume against the position JD.
+    Returns structured fitment analysis for this specific role.
+    """
+    system_prompt = """You are an elite AI Talent Intelligence system used by top executive search firms.
+
+Your task: Analyze a candidate's resume against a specific Job Description and return a structured fitment assessment.
+
+Rules:
+- Be specific — reference actual content from the resume and JD
+- Do NOT give generic feedback — tie every point to THIS EXACT role
+- Extract the candidate's name and email from the resume text if present
+- Be honest about gaps — do not inflate scores
+
+Return ONLY valid JSON in this exact structure:
+{
+  "candidate_name": "Full name extracted from resume, or 'Unknown Candidate' if not found",
+  "candidate_email": "email@domain.com or null",
+  "candidate_current_role": "Current job title and company from resume, or null",
+  "resume_score": 7.8,
+  "jd_match_percent": 78,
+  "strengths": [
+    "Specific strength 1 tied to JD requirement",
+    "Specific strength 2 tied to JD requirement",
+    "Specific strength 3 tied to JD requirement"
+  ],
+  "gaps": [
+    "Specific gap 1 vs JD requirement",
+    "Specific gap 2 vs JD requirement"
+  ],
+  "experience_summary": "2 sentences summarizing the candidate's relevance to this specific role",
+  "verdict": "STRONG FIT",
+  "verdict_rationale": "2-3 sentences explaining why this verdict for THIS role specifically",
+  "recommended_stage": "Interview L1"
+}
+
+verdict must be exactly one of: STRONG FIT | POTENTIAL FIT | WEAK FIT | NOT SUITABLE
+recommended_stage must be exactly one of: Screened | Interview L1 | Interview L2 | Rejected
+resume_score is 0-10 (not inflated — 10 means near-perfect match)
+jd_match_percent is 0-100"""
+
+    user_prompt = f"""ROLE TO FILL:
+Title: {role_title}
+Level: {level}
+Department: {business_unit}
+
+JD PURPOSE:
+{jd_purpose}
+
+KEY RESPONSIBILITIES:
+{chr(10).join(f'- {r}' for r in jd_responsibilities[:8])}
+
+EXPERIENCE REQUIREMENTS:
+{chr(10).join(f'- {e}' for e in jd_experience[:5])}
+
+---
+CANDIDATE RESUME:
+{resume_text[:6000]}
+
+Analyze this candidate's fit for the above role."""
+
+    return await _call_llm(system_prompt, user_prompt)

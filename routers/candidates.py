@@ -5,7 +5,14 @@ from typing import List
 import random
 import string
 
-from database import candidates_collection, positions_collection
+from database import (
+    positions_collection,
+    candidates_collection,
+    psychometric_profiles_collection,
+    psychometric_scores_collection,
+    psychometric_reports_collection,
+    schedules_collection
+)
 from models.candidate import CandidateCreate, CandidateUpdate, CandidateResponse
 from core.deps import get_current_user
 
@@ -145,6 +152,9 @@ async def delete_candidate(
         raise HTTPException(status_code=404, detail="Candidate not found")
 
     await candidates_collection.delete_one({"_id": oid})
+
+    # Delete all associated schedules
+    await schedules_collection.delete_many({"candidate_id": candidate_id})
 
     # Decrement position counter
     pos_id = candidate.get("position_id")
