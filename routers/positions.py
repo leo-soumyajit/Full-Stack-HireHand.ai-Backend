@@ -8,7 +8,7 @@ import string
 from database import positions_collection, candidates_collection
 from models.position import (
     PositionCreate, PositionUpdate, PositionStatusUpdate,
-    PositionJDUpdate, PositionResponse
+    PositionJDUpdate, PositionResponse, PositionL1QuestionsUpdate
 )
 from core.deps import get_current_user
 
@@ -33,6 +33,7 @@ def _doc_to_response(doc: dict) -> PositionResponse:
         status=doc.get("status", "Active"),
         jd=doc.get("jd"),
         jd_versions=doc.get("jd_versions", []),
+        l1_questions=doc.get("l1_questions", []),
         candidates_count=doc.get("candidates_count", 0),
         shortlisted_count=doc.get("shortlisted_count", 0),
         risk_flag=doc.get("risk_flag"),
@@ -79,6 +80,7 @@ async def create_position(
         "status": "Active",
         "jd": None,
         "jd_versions": [],
+        "l1_questions": [],
         "candidates_count": 0,
         "shortlisted_count": 0,
         "risk_flag": "New Opening",
@@ -150,6 +152,25 @@ async def save_position_jd(
             "$set": {"jd": body.jd.model_dump(), "updated_at": now},
             "$push": {"jd_versions": new_version}
         },
+        return_document=True
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Position not found")
+    return _doc_to_response(result)
+
+
+@router.put("/{position_id}/l1-questions", response_model=PositionResponse)
+async def update_position_l1_questions(
+    position_id: str,
+    body: PositionL1QuestionsUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update or save the L1 Interview questions for a position."""
+    oid = _validate_oid(position_id)
+    questions_dump = [q.model_dump() for q in body.questions]
+    result = await positions_collection.find_one_and_update(
+        {"_id": oid, "user_id": current_user["id"]},
+        {"$set": {"l1_questions": questions_dump, "updated_at": datetime.now(timezone.utc).isoformat()}},
         return_document=True
     )
     if not result:

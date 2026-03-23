@@ -151,7 +151,7 @@ async def screen_resume(
             "name": analysis.candidate_name,
             "role": analysis.candidate_current_role or "Not specified",
             "email": analysis.candidate_email or "",
-            "stage": analysis.recommended_stage,
+            "stage": "Rejected" if analysis.recommended_stage == "Rejected" else "Screened",
             "scores": {
                 "resume": resume_score,
                 "psych": 0.0,
@@ -165,6 +165,21 @@ async def screen_resume(
 
         result = await candidates_collection.insert_one(candidate_doc)
         candidate_id = str(result.inserted_id)
+
+        # Increment candidates_count for the position
+        await positions_collection.update_one(
+            {"_id": ObjectId(position_id)},
+            {"$inc": {"candidates_count": 1}}
+        )
+
+        # Save resume to disk
+        try:
+            import os
+            os.makedirs("uploads/resumes", exist_ok=True)
+            with open(f"uploads/resumes/{candidate_id}.pdf", "wb") as f:
+                f.write(file_bytes)
+        except Exception as e:
+            print(f"Warning: Could not save resume PDF to disk: {e}")
 
     return {
         "analysis": analysis.model_dump(),

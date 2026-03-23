@@ -57,3 +57,90 @@ def send_interview_email(to_email: str, candidate_name: str, position_title: str
         print(f"✅ Real email successfully sent to {to_email}")
     except Exception as e:
         print(f"❌ Failed to send real email: {e}")
+
+def send_shortlisted_email(to_email: str, candidate_name: str, position_title: str):
+    """
+    Sends a shortlisted email to the candidate.
+    Requires SMTP credentials in the environment.
+    """
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print("\n⚠️ [WARNING] SMTP_USERNAME or SMTP_PASSWORD not found in .env.")
+        print(f"⚠️ Could not send real email to {to_email}. Please add credentials.")
+        return
+    
+    msg = EmailMessage()
+    msg['Subject'] = f"Update on your application: {position_title}"
+    msg['From'] = f"HireHand AI <{SMTP_USERNAME}>"
+    msg['To'] = to_email
+    
+    # HTML Email body for a professional look
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-w-2xl mx-auto p-4 border border-gray-200 rounded-lg">
+            <h2 style="color: #4F46E5;">Application Shortlisted</h2>
+            <p>Dear <strong>{candidate_name}</strong>,</p>
+            <p>We are pleased to inform you that your profile has been <strong>shortlisted</strong> for the <strong>{position_title}</strong> position.</p>
+            <p>Our hiring team was very impressed with your background and skills. We will be reaching out to you shortly with the next steps, which may include an interview schedule or further assessments.</p>
+            <p>Congratulations, and we look forward to exploring your potential with us!</p>
+            <br/>
+            <p style="font-size: 14px; color: #666;">Best regards,<br/>HireHand Hiring Team</p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    msg.set_content("Please enable HTML to view this message.")
+    msg.add_alternative(html_content, subtype='html')
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ Real email successfully sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Failed to send real email: {e}")
+
+def send_rejection_email(to_email: str, candidate_name: str, position_title: str):
+    """
+    Sends a rejection/unselected email to the candidate.
+    Requires SMTP credentials in the environment.
+    """
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print("\n⚠️ [WARNING] SMTP_USERNAME or SMTP_PASSWORD not found in .env.")
+        print(f"⚠️ Could not send real email to {to_email}. Please add credentials.")
+        return
+    
+    msg = EmailMessage()
+    msg['Subject'] = f"Update on your application: {position_title}"
+    msg['From'] = f"HireHand AI <{SMTP_USERNAME}>"
+    msg['To'] = to_email
+    
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-w-2xl mx-auto p-4 border border-gray-200 rounded-lg">
+            <h2 style="color: #4F46E5;">Application Update</h2>
+            <p>Dear <strong>{candidate_name}</strong>,</p>
+            <p>Thank you very much for your interest in the <strong>{position_title}</strong> position and for taking the time to apply.</p>
+            <p>After carefully reviewing your profile along with the other applications, we regret to inform you that we will not be moving forward with your candidacy at this time. This was a difficult decision, as we received many strong applications.</p>
+            <p>We truly appreciate the time and effort you put into your application and wish you the absolute best in your future endeavors.</p>
+            <br/>
+            <p style="font-size: 14px; color: #666;">Best regards,<br/>HireHand Hiring Team</p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    msg.set_content("Please enable HTML to view this message.")
+    msg.add_alternative(html_content, subtype='html')
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ Real email successfully sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Failed to send real email: {e}")

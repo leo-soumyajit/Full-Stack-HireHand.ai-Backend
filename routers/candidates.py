@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
+import os
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import List
@@ -13,8 +15,15 @@ from database import (
     psychometric_reports_collection,
     schedules_collection
 )
+from pydantic import BaseModel
 from models.candidate import CandidateCreate, CandidateUpdate, CandidateResponse
 from core.deps import get_current_user
+
+class BulkEmailRequest(BaseModel):
+    candidate_ids: List[str]
+    email_type: str = "shortlist"
+
+
 
 router = APIRouter()
 
@@ -54,6 +63,49 @@ async def get_candidates(
     ).sort("added_date", -1)
     docs = await cursor.to_list(length=1000)
     return [_doc_to_response(d) for d in docs]
+
+
+@router.post("/{position_id}/candidates/bulk-email", status_code=status.HTTP_200_OK)
+async def send_bulk_emails(
+    position_id: str,
+    body: BulkEmailRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Send shortlisted email to multiple candidates."""
+    await _assert_position_owner(position_id, current_user["id"])
+    
+    pos = await positions_collection.find_one({"_id": ObjectId(position_id)})
+    if not pos:
+        raise HTTPException(status_code=404, detail="Position not found")
+        
+    position_title = pos.get("title", "Position")
+
+    cand_oids = []
+    for cid in body.candidate_ids:
+        try:
+            cand_oids.append(ObjectId(cid))
+        except:
+            pass
+            
+    if not cand_oids:
+        return {"message": "No valid candidates provided", "sent_count": 0}
+        
+    cursor = candidates_collection.find({"_id": {"$in": cand_oids}, "user_id": current_user["id"]})
+    candidates = await cursor.to_list(length=1000)
+    
+    from core.email import send_shortlisted_email, send_rejection_email
+    
+    sent_count = 0
+    for cand in candidates:
+        email = cand.get("email")
+        if email:
+            if body.email_type == "reject":
+                send_rejection_email(email, cand.get("name", "Candidate"), position_title)
+            else:
+                send_shortlisted_email(email, cand.get("name", "Candidate"), position_title)
+            sent_count += 1
+            
+    return {"message": f"Successfully sent emails to {sent_count} candidates", "sent_count": sent_count}
 
 
 @router.post("/{position_id}/candidates", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
@@ -165,6 +217,50 @@ async def delete_candidate(
              "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
         )
 
+
+@router.get("/candidates/{candidate_id}")
+async def get_candidate(
+    candidate_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Fetch full candidate details including resume analysis."""
+    try:
+        oid = ObjectId(candidate_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+        
+    doc = await candidates_collection.find_one({"_id": oid, "user_id": current_user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+        
+    doc["id"] = str(doc.pop("_id"))
+    return doc
+
+
+@router.get("/candidates/{candidate_id}/resume")
+async def download_candidate_resume(
+    candidate_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Download the original uploaded resume PDF."""
+    try:
+        oid = ObjectId(candidate_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid candidate ID")
+        
+    candidate = await candidates_collection.find_one({"_id": oid, "user_id": current_user["id"]})
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+        
+    file_path = f"uploads/resumes/{candidate_id}.pdf"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Original resume file not found on server.")
+        
+    return FileResponse(
+        path=file_path,
+        filename=f"{candidate.get('name', 'Candidate')}_Resume.pdf",
+        media_type="application/pdf"
+    )
 
 async def _assert_position_owner(position_id: str, user_id: str):
     """Ensure position_id belongs to user_id — prevents cross-user access."""

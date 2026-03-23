@@ -2,6 +2,15 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
+class L1Question(BaseModel):
+    id: str
+    text: str
+    category: str
+    difficulty: str
+
+class PositionL1QuestionsUpdate(BaseModel):
+    questions: List[L1Question]
+
 
 class PositionJD(BaseModel):
     purpose: str = ""
@@ -53,6 +62,7 @@ class PositionResponse(BaseModel):
     status: str
     jd: Optional[PositionJD] = None
     jd_versions: List[JDVersion] = []
+    l1_questions: List[L1Question] = []
     candidates_count: int = 0
     shortlisted_count: int = 0
     risk_flag: Optional[str] = None
