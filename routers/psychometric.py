@@ -285,11 +285,10 @@ async def generate_report(candidate_id: str, user=Depends(get_current_user)):
     "/candidates/{candidate_id}/psychometric-report",
     response_model=FitmentReportResponse,
 )
-async def get_report(candidate_id: str, user=Depends(get_current_user)):
+async def get_report(candidate_id: str):
     """Fetch existing fitment report for a candidate."""
-    user_id = _get_user_id(user)
     doc = await psychometric_reports_collection.find_one(
-        {"candidate_id": candidate_id, "user_id": user_id}
+        {"candidate_id": candidate_id}
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Fitment report not found")

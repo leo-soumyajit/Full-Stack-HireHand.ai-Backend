@@ -236,3 +236,126 @@ CANDIDATE RESUME:
 Analyze this candidate's fit for the above role."""
 
     return await _call_llm(system_prompt, user_prompt)
+
+# ── FULL AUTOMATED PSYCHOMETRIC TEST (CANDIDATE FACING) ───────────────────
+
+async def generate_psychometric_mcq_test(
+    jd_text: str, role_title: str, level: str, business_unit: str, num_questions: int = 10
+) -> dict:
+    """
+    Generate a role-calibrated, scenario-based MCQ test.
+    Instead of asking direct questions, frame them as complex scenarios a person in THIS role would face.
+    Each option represents a different behavioral trait.
+    """
+    system_prompt = f"""You are EOS-IA, an elite psychometric intelligence system.
+Your task: Generate exactly {num_questions} hyper-specific, scenario-based behavioral multiple-choice questions for the following role.
+
+Rules:
+1. Do NOT ask generic questions ("What is your greatest weakness?").
+2. Create highly realistic, stressful, or ambiguous scenarios specific to THIS role's context.
+3. Provide exactly 4 options for each question (A, B, C, D).
+4. Do NOT mark a "correct" answer. Every option must represent a valid but distinct behavioral archetype (e.g., Risk-averse vs. Risk-seeking, Collaborative vs. Autocratic, Speed vs. Accuracy).
+5. The options must be subtle; no obvious "bad" answers.
+
+Return ONLY valid JSON:
+{{
+  "questions": [
+    {{
+      "id": "q_1",
+      "trait_assessed": "Risk Tolerance vs. Governance",
+      "scenario": "A highly detailed 2-3 sentence realistic scenario specific to the role's pressures.",
+      "options": [
+        {{ "id": "A", "text": "Detailed action corresponding to Archetype 1" }},
+        {{ "id": "B", "text": "Detailed action corresponding to Archetype 2" }},
+        {{ "id": "C", "text": "Detailed action corresponding to Archetype 3" }},
+        {{ "id": "D", "text": "Detailed action corresponding to Archetype 4" }}
+      ]
+    }}
+  ]
+}}"""
+
+    user_prompt = f"""Role: {role_title} | Level: {level} | BU: {business_unit}
+
+JOB DESCRIPTION CONTEXT:
+{jd_text}
+
+Generate {num_questions} scenario questions now."""
+
+    return await _call_llm(system_prompt, user_prompt)
+
+
+async def analyze_psychometric_mcq_submission(
+    jd_text: str, role_title: str, test_data: dict, submission_data: dict
+) -> dict:
+    """
+    Analyze the candidate's chosen answers AND the behavioral telemetry (time spent).
+    Returns a full FitmentReport structure.
+    """
+    system_prompt = """You are EOS-IA, an elite psychometric intelligence system.
+Your task: Analyze a candidate's responses to a role-calibrated scenario test.
+Critically, you must evaluate TWO dimensions:
+1. THE DECISION (Which option they chose, mapping to behavioral traits).
+2. THE BEHAVIORAL TELEMETRY (How long they took in milliseconds).
+
+Telemetry interpretation heuristics:
+- Very fast (< 5000ms) on complex scenarios = Rushed, impulsive, or lack of depth.
+- Average (10000ms - 25000ms) = Measured, confident decision making.
+- Very slow (> 45000ms) on ambiguous scenarios = Overthinking, hesitation, risk-aversion, or freezing under pressure.
+
+You must output a highly judgmental, specific, corporate-grade Fitment Report matching the role's JD.
+
+Return ONLY valid JSON matching this exact structure:
+{
+  "trait_matrix": [
+    {
+      "trait": "Name of trait assessed (e.g., Decisiveness under ambiguity)",
+      "score": 8.5,
+      "interpretation": "2 sentences analyzing their choices AND their timing for this trait."
+    }
+  ],
+  "pattern_cluster": {
+    "name": "Short archetype name (e.g., Hesitant Analyst, Impulsive Executor)",
+    "description": "2-3 sentences describing their overall behavioral pattern.",
+    "sentiment": "positive | neutral | negative"
+  },
+  "risk": {
+    "level": "LOW | MEDIUM | HIGH",
+    "statement": "One-line core behavioral risk",
+    "role_specific_risk": "How this specific behavioral pattern will fail inside THIS specific role's context."
+  },
+  "verdict": {
+    "decision": "GO | CONDITIONAL GO | NO-GO",
+    "rationale": "Why this decision, based on the intersection of their choices, telemetry, and the JD demands.",
+    "coaching_note": "What to watch for if hired, or exact reason for rejection."
+  },
+  "composite_psych_score": 75
+}
+
+composite_psych_score must be 0-100."""
+
+    # Reconstruct the candidate's journey for the prompt
+    responses_mapped = []
+    questions_dict = {q['id']: q for q in test_data.get('questions', [])}
+    
+    for resp in submission_data.get('responses', []):
+        q_id = resp.get('question_id')
+        q = questions_dict.get(q_id)
+        if q:
+            opt = next((o for o in q['options'] if o['id'] == resp.get('selected_option_id')), None)
+            responses_mapped.append(f"""
+Question: {q['scenario']}
+Trait Assessed: {q['trait_assessed']}
+Candidate Chose: {opt['text'] if opt else 'Skipped'}
+Time Spent: {resp.get('time_spent_ms', 0)} ms""")
+
+    user_prompt = f"""Role: {role_title}
+
+JOB DESCRIPTION CONTEXT:
+{jd_text}
+
+CANDIDATE'S ASSESSMENT JOURNEY (Telemetry included):
+{''.join(responses_mapped)}
+
+Generate the Fitment Report JSON."""
+
+    return await _call_llm(system_prompt, user_prompt)

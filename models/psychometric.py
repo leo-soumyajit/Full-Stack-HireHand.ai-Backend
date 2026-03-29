@@ -111,3 +111,45 @@ class FitmentReportResponse(BaseModel):
     verdict: FitmentVerdict
     composite_psych_score: float
     generated_at: str
+
+
+# ── Full Automated Assessment Flow Models ─────────────────────────────────
+
+class AssessmentQuestionOption(BaseModel):
+    id: str
+    text: str
+
+class AssessmentQuestion(BaseModel):
+    id: str
+    trait_assessed: str
+    scenario: str
+    options: List[AssessmentQuestionOption]
+
+class AssessmentTest(BaseModel):
+    position_id: str
+    role_title: str
+    time_limit_minutes: int
+    questions: List[AssessmentQuestion]
+    generated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+class AssessmentLink(BaseModel):
+    token: str
+    candidate_id: str
+    position_id: str
+    user_id: str
+    expires_at: str
+    is_completed: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+class QuestionResponse(BaseModel):
+    question_id: str
+    selected_option_id: str
+    time_spent_ms: int
+
+class AssessmentSubmission(BaseModel):
+    candidate_id: str
+    position_id: str
+    responses: List[QuestionResponse]
+    total_time_spent_ms: int
+    submitted_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+

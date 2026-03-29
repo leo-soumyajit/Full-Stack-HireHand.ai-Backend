@@ -58,6 +58,54 @@ def send_interview_email(to_email: str, candidate_name: str, position_title: str
     except Exception as e:
         print(f"❌ Failed to send real email: {e}")
 
+def send_assessment_email(to_email: str, candidate_name: str, position_title: str, assessment_url: str, time_limit: int):
+    """
+    Sends an actual email to the candidate with the psychometric assessment link.
+    Requires SMTP credentials in the environment.
+    """
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print("\n⚠️ [WARNING] SMTP_USERNAME or SMTP_PASSWORD not found in .env.")
+        print(f"⚠️ Could not send real email to {to_email}. Please add credentials.")
+        return
+    
+    msg = EmailMessage()
+    msg['Subject'] = f"Technical Assessment Invitation: {position_title}"
+    msg['From'] = f"HireHand AI <{SMTP_USERNAME}>"
+    msg['To'] = to_email
+    
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-w-2xl mx-auto p-4 border border-gray-200 rounded-lg">
+            <h2 style="color: #4F46E5;">EOS-IA Psychometric Assessment</h2>
+            <p>Dear <strong>{candidate_name}</strong>,</p>
+            <p>As part of the evaluation process for the <strong>{position_title}</strong> role, please complete the following technical assessment.</p>
+            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 16px;"><strong>Time Limit:</strong> {time_limit} Minutes</p>
+                <p style="margin: 10px 0 0 0; font-size: 16px;">
+                    <strong>Assessment Link:</strong> <a href="{assessment_url}" style="color: #2563eb; font-weight: bold;">Begin Assessment Here</a>
+                </p>
+            </div>
+            <p style="color: #d97706; font-size: 14px;"><strong>Note:</strong> Once you begin, a strict timer will start. The assessment will automatically submit when time is up. Please ensure you have a stable internet connection.</p>
+            <p>Best of luck!</p>
+            <br/>
+            <p style="font-size: 14px; color: #666;">Regards,<br/>HireHand Hiring Team</p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    msg.set_content("Please enable HTML to view this message.")
+    msg.add_alternative(html_content, subtype='html')
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ Real assessment email successfully sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Failed to send real email: {e}")
 def send_shortlisted_email(to_email: str, candidate_name: str, position_title: str):
     """
     Sends a shortlisted email to the candidate.

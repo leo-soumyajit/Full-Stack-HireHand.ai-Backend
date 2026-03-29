@@ -7,6 +7,7 @@ class L1Question(BaseModel):
     text: str
     category: str
     difficulty: str
+    level: Optional[str] = None  # "L1" | "L2" | "L3" | "L4" | "L5"
 
 class PositionL1QuestionsUpdate(BaseModel):
     questions: List[L1Question]

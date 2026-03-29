@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from database import init_db
-from routers import auth, positions, candidates, psychometric, resume_screen, schedules
+from routers import auth, positions, candidates, psychometric, resume_screen, schedules, assessment
 
 app = FastAPI(
     title="HireHand AI Backend",
@@ -48,6 +48,7 @@ app.include_router(candidates.router, prefix="/api/positions", tags=["Candidates
 app.include_router(psychometric.router, prefix="/api/psychometric", tags=["EOS-IA Psychometric"])
 app.include_router(resume_screen.router, prefix="/api", tags=["AI Resume Screening"])
 app.include_router(schedules.router, prefix="/api/schedules", tags=["Schedules"])
+app.include_router(assessment.router, prefix="/api/assessment", tags=["Candidate Assessment"])
 
 
 @app.get("/")

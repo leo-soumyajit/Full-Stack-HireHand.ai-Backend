@@ -18,6 +18,11 @@ psychometric_profiles_collection = database.get_collection("psychometric_profile
 psychometric_scores_collection = database.get_collection("psychometric_scores")
 psychometric_reports_collection = database.get_collection("psychometric_reports")
 
+# Assessment Collections
+assessment_tests_collection = database.get_collection("assessment_tests")
+assessment_links_collection = database.get_collection("assessment_links")
+assessment_submissions_collection = database.get_collection("assessment_submissions")
+
 # Schedules Collection
 schedules_collection = database.get_collection("schedules")
 
@@ -43,8 +48,14 @@ async def init_db():
         [("candidate_id", 1), ("user_id", 1)], unique=True
     )
     await psychometric_reports_collection.create_index(
-        [("candidate_id", 1), ("user_id", 1)], unique=True
+        [("candidate_id", 1), ("position_id", 1)], unique=True
     )
+
+    # Assessments
+    await assessment_tests_collection.create_index([("position_id", 1)], unique=True)
+    await assessment_links_collection.create_index([("token", 1)], unique=True)
+    await assessment_links_collection.create_index([("candidate_id", 1), ("position_id", 1)])
+    await assessment_submissions_collection.create_index([("candidate_id", 1), ("position_id", 1)], unique=True)
 
     # Schedules
     await schedules_collection.create_index([("user_id", 1), ("scheduled_at", 1)])
