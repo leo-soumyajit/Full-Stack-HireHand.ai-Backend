@@ -29,5 +29,5 @@ class CandidateResponse(BaseModel):
     email: str
     stage: str
     scores: CandidateScores
-    verdict: str = "Conditional"
+    verdict: str = "Pending"
     added_date: str

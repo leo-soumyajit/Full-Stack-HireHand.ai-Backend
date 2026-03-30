@@ -260,7 +260,7 @@ async def generate_report(candidate_id: str, user=Depends(get_current_user)):
     # Update candidate's psych score in candidates collection for fast display
     composite = report_data.get("composite_psych_score", 0)
     verdict_obj = report_data.get("verdict", {})
-    verdict_str = verdict_obj.get("decision", "Conditional") if isinstance(verdict_obj, dict) else "Conditional"
+    verdict_str = verdict_obj.get("decision", "Pending") if isinstance(verdict_obj, dict) else "Pending"
 
     await candidates_collection.update_one(
         {"_id": ObjectId(candidate_id)},

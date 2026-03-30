@@ -118,11 +118,13 @@ class FitmentReportResponse(BaseModel):
 class AssessmentQuestionOption(BaseModel):
     id: str
     text: str
+    correct: Optional[bool] = None  # For Math & Aptitude questions
 
 class AssessmentQuestion(BaseModel):
     id: str
     trait_assessed: str
     scenario: str
+    question_type: Optional[str] = None  # Scenario | Conventional | Math & Aptitude | Behavioral | Logical Reasoning
     options: List[AssessmentQuestionOption]
 
 class AssessmentTest(BaseModel):

@@ -41,7 +41,7 @@ def _doc_to_response(doc: dict) -> CandidateResponse:
         email=doc.get("email", ""),
         stage=doc.get("stage", "Sourced"),
         scores=doc.get("scores", {"resume": 0.0, "psych": 0.0, "composite": 0}),
-        verdict=doc.get("verdict", "Conditional"),
+        verdict=doc.get("verdict", "Pending"),
         added_date=doc.get("added_date", ""),
     )
 
@@ -117,16 +117,11 @@ async def add_candidate(
     """Add a candidate to a position and auto-generate AI scores."""
     await _assert_position_owner(position_id, current_user["id"])
 
-    # Auto-generate scores
-    resume = round(6.0 + random.random() * 3.5, 1)
-    psych = round(6.0 + random.random() * 3.0, 1)
-    composite = round(((resume + psych) / 2) * 10)
-    if composite >= 85:
-        verdict = "Go"
-    elif composite >= 70:
-        verdict = "Conditional"
-    else:
-        verdict = "No-Go"
+    # Start with zero scores — real scores come from Resume Screening and Psych Test
+    resume = 0.0
+    psych = 0.0
+    composite = 0
+    verdict = "Pending"
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     doc = {

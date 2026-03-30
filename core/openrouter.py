@@ -101,8 +101,8 @@ async def generate_fitment_report(
     Given a psychometric profile and interviewer-submitted scores,
     generate the 4-part EOS-IA Fitment Report via LLM.
     """
-    system_prompt = """You are EOS-IA, generating a Psychometric Fitment Report.
-    
+    system_prompt = """You are EOS-IA, generating a Psychometric Fitment Report based on interviewer-submitted trait scores.
+
 You receive:
 1. The role's psychometric profile (context, stressors, required traits)
 2. Interviewer-submitted scores (1-10) per trait with optional notes
@@ -110,18 +110,39 @@ You receive:
 Your task: Generate a predictive, intelligent fitment report — not just an average.
 Model BEHAVIORAL PATTERNS, not just scores. Consider how traits INTERACT under the role's specific stressors.
 
+═══ SCORING INTERPRETATION GUIDELINES ═══
+• 1-3: Critical deficiency — this person will struggle severely in this trait area
+• 4-5: Below expectations — noticeable gaps that require significant development  
+• 6-7: Meets minimum bar — adequate but not differentiated
+• 8-9: Strong performer — clear strength with minor refinement needed
+• 10: Exceptional — rare elite-level capability
+
+═══ COMPOSITE SCORE CALCULATION ═══
+composite_psych_score (0-100) is NOT a simple average of trait scores × 10.
+You must:
+1. Weight traits by their criticality for THIS role (inferred from stressors and role type)
+2. Apply interaction effects: contradictory trait combinations (e.g., high autonomy + low communication) should PENALIZE
+3. Penalize if 2+ traits are below 5.0
+4. DO NOT default to 74-76. These are lazy anchor scores and are FORBIDDEN.
+5. Use the FULL 0-100 range based on genuine analysis.
+
+═══ VERDICT DETERMINATION ═══
+• GO: composite >= 78, risk LOW, no critical trait below 5.0
+• CONDITIONAL GO: composite 55-77, OR risk MEDIUM, OR 1 critical trait below 5.0
+• NO-GO: composite < 55, OR risk HIGH, OR 2+ traits below 4.0
+
 Return ONLY valid JSON in this exact structure:
 {
   "trait_matrix": [
     {
       "trait": "trait name",
-      "score": 7.5,
-      "interpretation": "Specific behavioral interpretation of this score in the context of this role. 1-2 sentences."
+      "score": "<1.0 to 10.0 — calculate based on actual data, use FULL range>",
+      "interpretation": "2-3 sentences: Specific behavioral interpretation of this score in the context of this role. Reference the interviewer's notes if provided."
     }
   ],
   "pattern_cluster": {
-    "name": "Short archetype name (e.g. Strategic Executor, Reactive Operator, Governance Shield)",
-    "description": "2-3 sentences describing how this person will behave in this role specifically",
+    "name": "Precise archetype (e.g., Strategic Executor, Reactive Operator, Governance Shield, Collaborative Strategist)",
+    "description": "3 sentences describing how this person will behave in this role specifically, based on the interaction of their trait scores.",
     "sentiment": "positive | neutral | negative"
   },
   "risk": {
@@ -131,19 +152,22 @@ Return ONLY valid JSON in this exact structure:
   },
   "verdict": {
     "decision": "GO | CONDITIONAL GO | NO-GO",
-    "rationale": "2-3 sentences justifying the verdict based on trait interactions and role stressors",
-    "coaching_note": "Specific development area if CONDITIONAL GO, positive reinforcement if GO, disqualifying reason if NO-GO"
+    "rationale": "3 sentences justifying the verdict based on trait interactions, scores, and role stressors. Reference specific low/high scores.",
+    "coaching_note": "2-3 actionable sentences: Development area if CONDITIONAL GO, strength reinforcement if GO, disqualifying evidence if NO-GO"
   },
-  "composite_psych_score": 74
+  "composite_psych_score": "<CALCULATE: 0-100 based on weighted trait scores, telemetry, and risk. DO NOT copy any number from this example — derive it from the actual scores above.>"
 }
 
-composite_psych_score should be 0-100. It is NOT a simple average — it weights critical role traits more heavily 
-and penalizes HIGH risk profiles."""
+CRITICAL: The composite_psych_score MUST be a raw integer (not a string). The placeholder above is just to show you must CALCULATE it yourself.
+ANTI-ANCHORING RULE: You are FORBIDDEN from outputting 62, 68, 74, 75, or 76 as composite_psych_score. These are known anchor values. Calculate the real score from the data."""
 
     scores_text = "\n".join(
         f"- {s['trait']}: {s['score']}/10" + (f" | Notes: {s['notes']}" if s.get("notes") else "")
         for s in scores
     )
+
+    # Calculate simple average for AI context
+    avg_score = sum(s['score'] for s in scores) / max(len(scores), 1)
 
     user_prompt = f"""Candidate: {candidate_name}
 Role: {role_title}
@@ -154,13 +178,19 @@ ROLE PSYCHOMETRIC CONTEXT:
 - Role Type: {profile.get('role_type', '')}
 - Key Stressors: {', '.join(profile.get('key_stressors', []))}
 
-INTERVIEWER SCORES:
+INTERVIEWER SCORES (Simple Average: {avg_score:.1f}/10):
 {scores_text}
 
 TRAIT DESCRIPTIONS:
 {chr(10).join(f"- {t['trait']}: {t['why_important']}" for t in profile.get('required_traits', []))}
 
-Generate the Psychometric Fitment Report."""
+Generate the Psychometric Fitment Report.
+
+SCORING FORMULA — You MUST follow this process:
+1. For each trait: Score = interviewer's raw score (already provided above as X/10)
+2. Compute weighted_avg = sum(trait_score × criticality_weight) / sum(criticality_weights). Assign criticality weights 1-3 per trait based on stressor relevance.
+3. composite_psych_score = round(weighted_avg × 10, adjusted for risk: subtract 5-15 if HIGH risk, subtract 0-5 if MEDIUM)
+4. The final composite_psych_score MUST be a single integer. DO NOT use 62, 68, 74, 75, or 76."""
 
     return await _call_llm(system_prompt, user_prompt)
 
@@ -240,22 +270,65 @@ Analyze this candidate's fit for the above role."""
 # ── FULL AUTOMATED PSYCHOMETRIC TEST (CANDIDATE FACING) ───────────────────
 
 async def generate_psychometric_mcq_test(
-    jd_text: str, role_title: str, level: str, business_unit: str, num_questions: int = 10
+    jd_text: str, role_title: str, level: str, business_unit: str, num_questions: int = 10,
+    question_type: str = "Scenario",
+    distribution: dict = None
 ) -> dict:
     """
-    Generate a role-calibrated, scenario-based MCQ test.
-    Instead of asking direct questions, frame them as complex scenarios a person in THIS role would face.
-    Each option represents a different behavioral trait.
+    Generate a role-calibrated MCQ test.
+    question_type: Scenario | Conventional | Math & Aptitude | Behavioral | Hybrid
+    distribution: dict with keys like {"scenario": 3, "behavioral": 3, "math": 2, "conventional": 2}
     """
-    system_prompt = f"""You are EOS-IA, an elite psychometric intelligence system.
-Your task: Generate exactly {num_questions} hyper-specific, scenario-based behavioral multiple-choice questions for the following role.
+    # Build type-specific instructions
+    type_instructions = {
+        "Scenario": """Create highly realistic, stressful, or ambiguous SCENARIO-BASED questions specific to THIS role's context.
+Each scenario should be 2-3 sentences describing a complex workplace situation the candidate would face in this role.
+Every option represents a valid but distinct behavioral archetype (e.g., Risk-averse vs. Risk-seeking, Collaborative vs. Autocratic).""",
+        "Conventional": """Create CONVENTIONAL psychometric questions — direct questions about personality, preferences, and work style.
+These are straightforward self-report items like "How do you typically handle conflict?" or "What best describes your approach to deadlines?"
+Each option represents a different personality dimension.""",
+        "Math & Aptitude": """Create MATH & APTITUDE questions — numerical reasoning, logical puzzles, pattern recognition, and analytical word problems.
+Each question should test quantitative or logical thinking relevant to this role's decision-making demands.
+Options must have exactly ONE correct answer. Tag the correct option with "correct": true.""",
+        "Behavioral": """Create BEHAVIORAL interview-style questions — "Tell me about a time when..." style questions rephrased as MCQs.
+Each question should ask how the candidate WOULD behave in a specific work situation tied to this role.
+Options should represent different behavioral responses from passive to proactive.""",
+        "Logical Reasoning": """Create LOGICAL REASONING questions — deductive logic, syllogisms, pattern sequences, if-then reasoning, and analytical argument evaluation.
+Each question should test the candidate's ability to think critically, identify logical fallacies, evaluate arguments, or solve abstract reasoning problems relevant to the role.
+Options must have exactly ONE correct answer. Tag the correct option with "correct": true.""",
+    }
 
-Rules:
+    if question_type == "Hybrid" and distribution:
+        # Build mixed instructions
+        parts = []
+        for qtype, count in distribution.items():
+            label = qtype.replace("_", " ").title()
+            if label in type_instructions and count > 0:
+                parts.append(f"\n--- Generate exactly {count} {label.upper()} questions ---\n{type_instructions[label]}")
+            elif label.lower() == "math & aptitude" and count > 0:
+                parts.append(f"\n--- Generate exactly {count} MATH & APTITUDE questions ---\n{type_instructions['Math & Aptitude']}")
+            elif count > 0:
+                # Fallback for unmapped types
+                mapped = label if label in type_instructions else "Scenario"
+                parts.append(f"\n--- Generate exactly {count} {label.upper()} questions ---\n{type_instructions.get(mapped, type_instructions['Scenario'])}")
+        type_block = "\n".join(parts)
+    else:
+        instr = type_instructions.get(question_type, type_instructions["Scenario"])
+        type_block = f"ALL {num_questions} questions must follow this style:\n{instr}"
+
+    system_prompt = f"""You are EOS-IA, an elite psychometric intelligence system.
+Your task: Generate exactly {num_questions} hyper-specific multiple-choice questions for the following role.
+
+QUESTION TYPE INSTRUCTIONS:
+{type_block}
+
+General Rules:
 1. Do NOT ask generic questions ("What is your greatest weakness?").
-2. Create highly realistic, stressful, or ambiguous scenarios specific to THIS role's context.
-3. Provide exactly 4 options for each question (A, B, C, D).
-4. Do NOT mark a "correct" answer. Every option must represent a valid but distinct behavioral archetype (e.g., Risk-averse vs. Risk-seeking, Collaborative vs. Autocratic, Speed vs. Accuracy).
-5. The options must be subtle; no obvious "bad" answers.
+2. Each question must have exactly 4 options (A, B, C, D).
+3. For behavioral/scenario/conventional types: Do NOT mark a "correct" answer. Every option must represent a valid but distinct behavioral archetype.
+4. For Math & Aptitude types: There IS one correct answer. Mark it with "correct": true in that option object.
+5. The options must be subtle; no obviously bad answers (except Math where one answer is correct).
+6. Each question must have a "trait_assessed" field describing what it evaluates.
 
 Return ONLY valid JSON:
 {{
@@ -263,12 +336,13 @@ Return ONLY valid JSON:
     {{
       "id": "q_1",
       "trait_assessed": "Risk Tolerance vs. Governance",
-      "scenario": "A highly detailed 2-3 sentence realistic scenario specific to the role's pressures.",
+      "scenario": "The question text (scenario/question/problem statement).",
+      "question_type": "Scenario",
       "options": [
-        {{ "id": "A", "text": "Detailed action corresponding to Archetype 1" }},
-        {{ "id": "B", "text": "Detailed action corresponding to Archetype 2" }},
-        {{ "id": "C", "text": "Detailed action corresponding to Archetype 3" }},
-        {{ "id": "D", "text": "Detailed action corresponding to Archetype 4" }}
+        {{ "id": "A", "text": "Option text" }},
+        {{ "id": "B", "text": "Option text" }},
+        {{ "id": "C", "text": "Option text" }},
+        {{ "id": "D", "text": "Option text" }}
       ]
     }}
   ]
@@ -279,9 +353,10 @@ Return ONLY valid JSON:
 JOB DESCRIPTION CONTEXT:
 {jd_text}
 
-Generate {num_questions} scenario questions now."""
+Generate {num_questions} questions now."""
 
     return await _call_llm(system_prompt, user_prompt)
+
 
 
 async def analyze_psychometric_mcq_submission(
@@ -289,73 +364,261 @@ async def analyze_psychometric_mcq_submission(
 ) -> dict:
     """
     Analyze the candidate's chosen answers AND the behavioral telemetry (time spent).
-    Returns a full FitmentReport structure.
+    Returns a full FitmentReport structure with accurate, non-biased scoring.
     """
-    system_prompt = """You are EOS-IA, an elite psychometric intelligence system.
-Your task: Analyze a candidate's responses to a role-calibrated scenario test.
-Critically, you must evaluate TWO dimensions:
-1. THE DECISION (Which option they chose, mapping to behavioral traits).
-2. THE BEHAVIORAL TELEMETRY (How long they took in milliseconds).
+    system_prompt = """You are EOS-IA, an elite psychometric intelligence system used by top-tier executive search firms (Korn Ferry, Egon Zehnder, McKinsey Talent).
 
-Telemetry interpretation heuristics:
-- Very fast (< 5000ms) on complex scenarios = Rushed, impulsive, or lack of depth.
-- Average (10000ms - 25000ms) = Measured, confident decision making.
-- Very slow (> 45000ms) on ambiguous scenarios = Overthinking, hesitation, risk-aversion, or freezing under pressure.
+Your task: Perform a RIGOROUS, DATA-DRIVEN analysis of a candidate's psychometric test submission.
 
-You must output a highly judgmental, specific, corporate-grade Fitment Report matching the role's JD.
+You must analyze THREE critical dimensions:
+1. THE DECISION — Which option they chose and what behavioral archetype it maps to.
+2. THE ALTERNATIVES — What they did NOT choose reveals equally important signals.
+3. THE BEHAVIORAL TELEMETRY — Response timing in milliseconds reveals unconscious decision patterns.
+
+═══ TELEMETRY INTERPRETATION RUBRIC ═══
+• Ultra-fast (< 3000ms): Gut-instinct / impulsive / didn't read fully → PENALIZE on complex scenarios
+• Fast (3000-8000ms): Quick pattern recognition OR superficial reading → Context-dependent
+• Measured (8000-20000ms): Deliberate, confident decision-making → NEUTRAL to POSITIVE
+• Slow (20000-40000ms): Careful analysis OR indecision → Role-dependent (good for governance roles, bad for execution roles)
+• Very slow (> 40000ms): Overthinking, analysis paralysis, freezing under pressure → PENALIZE for leadership/execution roles
+• Skipped (0ms or missing response): Candidate avoided the question entirely → STRONG NEGATIVE signal
+
+═══ SCORING SYSTEM (CRITICAL — READ CAREFULLY) ═══
+Each trait score must be 1.0 to 10.0 with genuine variance:
+• 1.0-3.0: Candidate's responses actively CONTRADICT what this role demands. Red flag.
+• 3.1-5.0: Weak alignment. Candidate shows opposing behavioral tendencies to what the role needs.
+• 5.1-6.5: Below average. Some alignment but significant gaps or concerning patterns.
+• 6.6-7.5: Average. Adequate but not differentiated. Would survive but not excel.
+• 7.6-8.5: Strong alignment. Clear behavioral fit with minor development areas.
+• 8.6-10.0: Exceptional. Near-perfect behavioral alignment for this exact role's demands.
+
+DO NOT cluster all scores between 7-9. Use the FULL range. If a candidate chose risk-averse options for a role demanding bold decision-making, their "Risk Tolerance" should be 2-4, NOT 7.
+
+═══ COMPOSITE SCORE FORMULA ═══
+composite_psych_score (0-100) is calculated by:
+1. Weight each trait by its CRITICALITY for this specific role (inferred from JD)
+2. Apply telemetry modifiers: consistent <3000ms across questions = -5 to -15 points, consistent >40000ms = -3 to -10 points
+3. Apply pattern penalty: If the behavioral pattern cluster is "negative" sentiment, cap score at 55
+4. Distribution enforcement: Scores of exactly 74, 75, or 76 are FORBIDDEN — these are lazy defaults
+
+═══ VERDICT RULES ═══
+• GO: composite_psych_score >= 78 AND risk level is LOW AND no critical trait below 5.0
+• CONDITIONAL GO: composite_psych_score 55-77, OR risk is MEDIUM, OR 1 critical trait below 5.0
+• NO-GO: composite_psych_score < 55, OR risk is HIGH, OR 2+ critical traits below 4.0, OR pattern sentiment is "negative" with score < 65
 
 Return ONLY valid JSON matching this exact structure:
 {
   "trait_matrix": [
     {
-      "trait": "Name of trait assessed (e.g., Decisiveness under ambiguity)",
-      "score": 8.5,
-      "interpretation": "2 sentences analyzing their choices AND their timing for this trait."
+      "trait": "Exact trait name from the test question (e.g., Decisiveness under ambiguity)",
+      "score": "<1.0 to 10.0 — calculate based on actual response data, use FULL range>",
+      "interpretation": "3-4 sentences: (1) What their chosen option reveals about this trait. (2) What they rejected reveals. (3) How their response time modifies the interpretation. (4) How this maps to the specific JD demands."
     }
   ],
   "pattern_cluster": {
-    "name": "Short archetype name (e.g., Hesitant Analyst, Impulsive Executor)",
-    "description": "2-3 sentences describing their overall behavioral pattern.",
+    "name": "Precise archetype (e.g., Hesitant Analyst, Impulsive Executor, Governance Shield, Collaborative Strategist, Reactive Firefighter)",
+    "description": "3-4 sentences describing their overall behavioral fingerprint — the intersection of ALL their choices and timing patterns. Include specific references to their actual responses.",
     "sentiment": "positive | neutral | negative"
   },
   "risk": {
     "level": "LOW | MEDIUM | HIGH",
-    "statement": "One-line core behavioral risk",
-    "role_specific_risk": "How this specific behavioral pattern will fail inside THIS specific role's context."
+    "statement": "One-line core behavioral risk based on actual response data",
+    "role_specific_risk": "3 sentences: How this specific behavioral pattern will create friction or failure inside THIS specific role, referencing specific JD requirements that conflict with their demonstrated tendencies."
   },
   "verdict": {
     "decision": "GO | CONDITIONAL GO | NO-GO",
-    "rationale": "Why this decision, based on the intersection of their choices, telemetry, and the JD demands.",
-    "coaching_note": "What to watch for if hired, or exact reason for rejection."
+    "rationale": "3-4 sentences justifying using specific data points from their responses — cite specific questions, choices, and timing.",
+    "coaching_note": "2-3 actionable sentences: If GO — what to watch post-hire. If CONDITIONAL GO — exact development plan needed. If NO-GO — the disqualifying behavioral evidence."
   },
-  "composite_psych_score": 75
+  "composite_psych_score": "<CALCULATE: 0-100 based on weighted trait scores, telemetry, and risk. DO NOT copy any number from this example — derive it from actual candidate data above.>"
 }
 
-composite_psych_score must be 0-100."""
+CRITICAL: The composite_psych_score MUST be a raw integer (not a string). The placeholder above is just to show you must CALCULATE it yourself.
+ANTI-ANCHORING RULE: You are FORBIDDEN from outputting 62, 68, 74, 75, or 76 as composite_psych_score. These are known anchor values. Calculate the real score from the data."""
 
-    # Reconstruct the candidate's journey for the prompt
+    # Reconstruct the candidate's journey with FULL option context
     responses_mapped = []
     questions_dict = {q['id']: q for q in test_data.get('questions', [])}
+    
+    answered_count = 0
+    skipped_count = 0
+    total_time = 0
     
     for resp in submission_data.get('responses', []):
         q_id = resp.get('question_id')
         q = questions_dict.get(q_id)
         if q:
-            opt = next((o for o in q['options'] if o['id'] == resp.get('selected_option_id')), None)
+            selected_id = resp.get('selected_option_id')
+            chosen_opt = next((o for o in q['options'] if o['id'] == selected_id), None)
+            time_ms = resp.get('time_spent_ms', 0)
+            total_time += time_ms
+            
+            if chosen_opt:
+                answered_count += 1
+            else:
+                skipped_count += 1
+            
+            # Show ALL options so AI knows what was rejected
+            all_options_text = "\n".join(
+                f"    {'→ CHOSEN →' if o['id'] == selected_id else '           '} {o['id']}. {o['text']}"
+                for o in q['options']
+            )
+            
             responses_mapped.append(f"""
-Question: {q['scenario']}
-Trait Assessed: {q['trait_assessed']}
-Candidate Chose: {opt['text'] if opt else 'Skipped'}
-Time Spent: {resp.get('time_spent_ms', 0)} ms""")
+━━━ Question: {q['scenario']}
+    Trait Assessed: {q['trait_assessed']}
+    Question Type: {q.get('question_type', 'Scenario')}
+    Response Time: {time_ms}ms ({
+        'ULTRA-FAST — possible impulsive' if time_ms < 3000 else
+        'FAST' if time_ms < 8000 else
+        'MEASURED' if time_ms < 20000 else
+        'SLOW — possible overthinking' if time_ms < 40000 else
+        'VERY SLOW — analysis paralysis risk'
+    })
+    Options Available:
+{all_options_text}
+    Candidate's Decision: {'CHOSE ' + chosen_opt['id'] + ' — ' + chosen_opt['text'] if chosen_opt else '⚠️ SKIPPED / NO ANSWER'}""")
+
+    # Identify questions that were never answered (not in responses at all)
+    responded_q_ids = {r.get('question_id') for r in submission_data.get('responses', [])}
+    for q_id, q in questions_dict.items():
+        if q_id not in responded_q_ids:
+            skipped_count += 1
+            responses_mapped.append(f"""
+━━━ Question: {q['scenario']}
+    Trait Assessed: {q['trait_assessed']}
+    ⚠️ COMPLETELY SKIPPED — Candidate did not answer this question at all.""")
 
     user_prompt = f"""Role: {role_title}
 
 JOB DESCRIPTION CONTEXT:
 {jd_text}
 
-CANDIDATE'S ASSESSMENT JOURNEY (Telemetry included):
+═══ ASSESSMENT STATISTICS ═══
+• Total Questions: {len(questions_dict)}
+• Answered: {answered_count}
+• Skipped/Unanswered: {skipped_count}
+• Total Assessment Time: {total_time}ms ({total_time // 1000}s / {total_time // 60000}min)
+• Average Time Per Answered Question: {total_time // max(answered_count, 1)}ms
+
+═══ CANDIDATE'S COMPLETE ASSESSMENT JOURNEY ═══
 {''.join(responses_mapped)}
 
-Generate the Fitment Report JSON."""
+═══ ANALYSIS INSTRUCTION ═══
+Based on the above data, generate the Fitment Report JSON.
 
+SCORING FORMULA — You MUST follow this process:
+1. For each trait: assess behavioral alignment (1-10) based on CHOSEN option + REJECTED options + response time
+2. Compute weighted_avg = sum(trait_score × criticality_weight) / sum(criticality_weights). Assign criticality weights 1-3 per trait based on JD relevance.
+3. Apply modifiers: avg response time <3000ms → subtract 5-10 points. Skipped questions → subtract 5 per skip.
+4. composite_psych_score = round(weighted_avg × 10 + modifiers)
+5. The final composite_psych_score MUST be a single integer. DO NOT use 62, 68, 74, 75, or 76.
+6. Reference specific questions and response times in your interpretations.
+7. If {skipped_count} questions were skipped, this is a MAJOR negative signal."""
+
+    return await _call_llm(system_prompt, user_prompt)
+
+# ── DASHBOARD AI TOOLS (Recruiter Facing) ──────────────────────────
+
+async def generate_jd_questions(job_description: str) -> dict:
+    system_prompt = """You are an expert HR Technical Recruiter. Your task is to analyze the following Job Description (JD) and generate a highly structured, professional set of 8-12 interview questions tailored specifically to the requirements and responsibilities outlined in the JD.
+
+For each question, assign it to ONE of the following precise categories: Technical, Behavioral, Problem Solving, Aptitude, Managerial, Communication, Cultural Fit, Leadership, Domain Knowledge, System Design, Math & Logical. Ensure there is a good mix of categories represented.
+
+You MUST respond strictly with a valid JSON object containing a single key "questions" which is an array of objects. Do not include any markdown formatting or explanations.
+
+Example required format:
+{
+  "questions": [
+    {
+      "id": "unique-string-1",
+      "text": "How do you approach debugging complex technical issues in [Technology from JD]?",
+      "category": "Technical"
+    }
+  ]
+}"""
+    user_prompt = f"Please generate interview questions based on this Job Description:\n\n{job_description}"
+    return await _call_llm(system_prompt, user_prompt)
+
+
+async def enhance_partial_jd(raw_jd: str, existing_jd: dict = None) -> dict:
+    existing_context = f"CRITICAL CONTEXT: The user is requesting modifications to an EXISTING Job Description. Here is the current Job Description:\n{existing_jd}\nYou must ONLY modify the specific sections requested by the user. Keep everything else identical."
+    new_context = "CRITICAL CONTEXT: You are creating a NEW Job Description from scratch."
+    
+    system_prompt = f"""You are an Elite Executive Technical Recruiter at a FAANG tier company. You write highly professional, expansive, and deeply engaging Job Descriptions. Your task is to process the user's input and return a fully structured Job Description.
+
+{existing_context if existing_jd else new_context}
+
+OUTPUT REQUIREMENTS:
+- "purpose": 4-6 highly professional sentences.
+- "education": 4+ rigorous bullet points.
+- "experience": 6+ highly descriptive bullet points.
+- "responsibilities": 8-10 expansive, action-oriented bullet points.
+- "skills": 10+ specific hard and soft skills.
+
+Required JSON format:
+{{
+  "purpose": "string",
+  "education": ["string", "string"],
+  "experience": ["string", "string"],
+  "responsibilities": ["string", "string"],
+  "skills": ["string", "string"]
+}}"""
+    user_prompt = f"Please modify the job description according to these instructions:\n\n{raw_jd}" if existing_jd else f"Please enhance and structure this raw Job Description:\n\n{raw_jd}"
+    return await _call_llm(system_prompt, user_prompt)
+
+
+async def enhance_full_jd(raw_jd: str) -> dict:
+    system_prompt = """You are an Elite Executive Technical Recruiter at a FAANG tier company. You write highly professional, expansive, and deeply engaging Job Descriptions. 
+Your task is to take an ENTIRE existing, potentially unformatted, messy, or basic Job Description provided by the user, and completely rewrite it to an elite FAANG standard.
+
+Required JSON format:
+{
+  "purpose": "string",
+  "education": ["string", "string"],
+  "experience": ["string", "string"],
+  "responsibilities": ["string", "string"],
+  "skills": ["string", "string"]
+}"""
+    user_prompt = f"Please completely restructure and enhance this raw Job Description into an elite format:\n\n{raw_jd}"
+    return await _call_llm(system_prompt, user_prompt)
+
+
+async def generate_structured_interview_questions(
+    job_description: str,
+    role: str,
+    level: str,
+    category: str,
+    easy: int,
+    medium: int,
+    hard: int,
+    existing_questions: list = None
+) -> dict:
+    total = easy + medium + hard
+    if total == 0:
+        return {"questions": []}
+        
+    system_prompt = f"""You are an elite HR Technical Recruiter at a FAANG-level organization. Generate exactly {total} highly professional "{level}" interview questions for the role of **"{role}"**.
+
+LEVEL: {level}
+CATEGORY: {category}
+DIFFICULTY: {easy} Easy, {medium} Medium, {hard} Hard.
+
+RULES: All {total} questions must be specifically in the "{category}" category and derived from the JD context.
+
+Required format:
+{{
+  "questions": [
+    {{
+      "id": "unique-string",
+      "text": "Your question text?",
+      "category": "{category}",
+      "difficulty": "Easy"
+    }}
+  ]
+}}"""
+    if existing_questions:
+        system_prompt += f"\n\nCRITICAL - DO NOT REPEAT: The following questions already exist: {[q.get('text') for q in existing_questions]!s}"
+
+    user_prompt = f"Generate exactly {total} {level} \"{category}\" interview questions ({easy} Easy, {medium} Medium, {hard} Hard) based on this Job Description for the \"{role}\" role:\n\n{job_description}"
     return await _call_llm(system_prompt, user_prompt)

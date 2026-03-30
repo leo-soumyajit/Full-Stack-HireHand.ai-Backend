@@ -37,6 +37,8 @@ class GenerateAssessmentRequest(BaseModel):
     position_id: str
     time_limit_minutes: int
     num_questions: int
+    question_type: str = "Scenario"  # Scenario | Conventional | Math & Aptitude | Behavioral | Hybrid
+    distribution: Dict[str, int] = None  # For Hybrid: {"scenario": 3, "behavioral": 3, ...}
 
 @router.post("/generate")
 async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict = Depends(get_current_user)):
@@ -68,7 +70,9 @@ async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict
         role_title=position.get('title', 'Unknown Role'),
         level=position.get('level', 'Mid'),
         business_unit=position.get('business_unit', 'General'),
-        num_questions=req.num_questions
+        num_questions=req.num_questions,
+        question_type=req.question_type,
+        distribution=req.distribution
     )
     
     # Sanitize AI output in case it messes up the options schema
