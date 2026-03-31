@@ -48,8 +48,12 @@ async def generate_questions(req: JDInputProps):
                 q["id"] = f"gen-{int(time.time()*1000)}-{i}"
                 
         return {"questions": questions_array}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
 
 @router.post("/enhance-jd")
 async def enhance_jd(req: EnhancePartialJDProps):
@@ -59,8 +63,12 @@ async def enhance_jd(req: EnhancePartialJDProps):
             
         result = await enhance_partial_jd(req.raw_jd, req.existing_jd)
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
 
 @router.post("/enhance-full-jd")
 async def enhance_full_jd_route(req: EnhanceFullJDProps):
@@ -70,8 +78,12 @@ async def enhance_full_jd_route(req: EnhanceFullJDProps):
             
         result = await enhance_full_jd(req.raw_jd)
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
 
 @router.post("/generate-interview")
 async def generate_interview(req: InterviewQuestionsProps):
@@ -108,5 +120,9 @@ async def generate_interview(req: InterviewQuestionsProps):
             q["level"] = req.level
             
         return {"questions": questions_array}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")

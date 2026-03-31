@@ -14,29 +14,160 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-async def _call_llm(system_prompt: str, user_prompt: str) -> dict:
-    """Generic async LLM call — returns parsed JSON dict."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(
-            OPENROUTER_URL,
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": OPENROUTER_MODEL,
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        content = content.replace("```json", "").replace("```", "").strip()
-        return json.loads(content)
+async def _call_llm(system_prompt: str, user_prompt: str, _retries: int = 3) -> dict:
+    """Generic async LLM call with automatic retry — returns parsed JSON dict."""
+    if not OPENROUTER_API_KEY:
+        raise ValueError("AI service is not configured. Please add your OpenRouter API key in backend settings.")
+
+    import asyncio as _asyncio
+    last_error = None
+
+    for attempt in range(1, _retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                resp = await client.post(
+                    OPENROUTER_URL,
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://hirehand.ai",
+                        "X-Title": "HireHand AI",
+                    },
+                    json={
+                        "model": OPENROUTER_MODEL,
+                        "route": "fallback",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    },
+                )
+
+                # ── Non-retryable errors (user must fix) ─────────────────
+                if resp.status_code == 401:
+                    raise ValueError("AI API key is invalid or expired. Please update your OpenRouter API key.")
+                elif resp.status_code == 402:
+                    raise ValueError("AI credits exhausted. Please add credits to your OpenRouter account.")
+
+                # ── Retryable errors ─────────────────────────────────────
+                if resp.status_code in (429, 503) or resp.status_code >= 500:
+                    err_msg = f"Status {resp.status_code}"
+                    try:
+                        err_body = resp.json()
+                        err_msg = err_body.get("error", {}).get("message", err_msg) if isinstance(err_body.get("error"), dict) else str(err_body.get("error", err_msg))
+                    except Exception:
+                        pass
+                    print(f"⚠️ OpenRouter attempt {attempt}/{_retries} failed: {err_msg}")
+                    last_error = err_msg
+                    if attempt < _retries:
+                        await _asyncio.sleep(1.5 * attempt)  # backoff: 1.5s, 3s
+                        continue
+                    # Final attempt failed
+                    if resp.status_code == 429:
+                        raise ValueError("AI rate limit reached. Please wait a moment and try again.")
+                    elif resp.status_code == 503:
+                        raise ValueError("AI service is temporarily unavailable. Please try again in a few seconds.")
+                    else:
+                        raise ValueError("AI service encountered an error. Please try again.")
+
+                # ── 400 Bad Request — check if it's a provider error (retryable) or user error ──
+                if resp.status_code == 400:
+                    try:
+                        err_body = resp.json()
+                        err_msg = err_body.get("error", {}).get("message", "") if isinstance(err_body.get("error"), dict) else str(err_body.get("error", ""))
+                    except Exception:
+                        err_msg = resp.text[:200]
+                    
+                    print(f"⚠️ OpenRouter attempt {attempt}/{_retries} — 400: {err_msg}")
+                    
+                    err_lower = err_msg.lower()
+                    
+                    # Transient upstream failures → retry
+                    transient_keywords = ["provider", "model output", "try again", "empty", "timeout", "overloaded", "capacity"]
+                    is_transient = any(kw in err_lower for kw in transient_keywords)
+                    
+                    if is_transient and attempt < _retries:
+                        last_error = err_msg
+                        await _asyncio.sleep(2.0 * attempt)  # backoff: 2s, 4s
+                        continue
+
+                    # Non-transient 400 errors — don't retry
+                    if ("not found" in err_lower or "not available" in err_lower) and "model" in err_lower:
+                        raise ValueError(f"AI model '{OPENROUTER_MODEL}' is not available. Please check OPENROUTER_MODEL in your .env file.")
+                    elif "content" in err_lower or "too long" in err_lower:
+                        raise ValueError("Request too large for AI. Try reducing the question count.")
+                    elif is_transient:
+                        # All retries exhausted for a transient error
+                        raise ValueError("AI service is temporarily busy. Please try again in a moment.")
+                    else:
+                        raise ValueError(f"AI generation failed: {err_msg[:150]}")
+                
+                # ── Other 4xx errors ─────────────────────────────────────
+                if resp.status_code >= 400:
+                    raise ValueError(f"AI service error ({resp.status_code}). Please check your configuration.")
+
+                # ── Success path ─────────────────────────────────────────
+                data = resp.json()
+
+                choices = data.get("choices")
+                if not choices or not isinstance(choices, list) or len(choices) == 0:
+                    if attempt < _retries:
+                        last_error = "Empty response"
+                        await _asyncio.sleep(1.0)
+                        continue
+                    raise ValueError("AI returned an empty response. Please try again.")
+
+                content = choices[0].get("message", {}).get("content", "")
+                if not content or not content.strip():
+                    if attempt < _retries:
+                        last_error = "Empty content"
+                        await _asyncio.sleep(1.0)
+                        continue
+                    raise ValueError("AI returned an empty response. Please try again.")
+
+                # Robust JSON extraction — handle markdown wrapping, extra text etc.
+                content = content.strip()
+                # Remove markdown code fences
+                if "```json" in content:
+                    content = content.split("```json", 1)[1]
+                if "```" in content:
+                    content = content.split("```", 1)[0]
+                content = content.strip()
+                
+                # If content doesn't start with { or [, try to find JSON within
+                if not content.startswith("{") and not content.startswith("["):
+                    start_brace = content.find("{")
+                    start_bracket = content.find("[")
+                    if start_brace >= 0 and (start_bracket < 0 or start_brace < start_bracket):
+                        content = content[start_brace:]
+                    elif start_bracket >= 0:
+                        content = content[start_bracket:]
+                
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError:
+                    if attempt < _retries:
+                        last_error = "Invalid JSON"
+                        continue
+                    raise ValueError("AI returned an invalid response format. Please try again.")
+
+        except httpx.TimeoutException:
+            print(f"⚠️ OpenRouter attempt {attempt}/{_retries} timed out")
+            last_error = "Timeout"
+            if attempt < _retries:
+                continue
+            raise ValueError("AI request timed out. Try reducing the question count or try again.")
+        except httpx.ConnectError:
+            raise ValueError("Could not connect to AI service. Please check your internet connection.")
+        except ValueError:
+            raise  # Re-raise our clean ValueError messages
+        except Exception as e:
+            last_error = str(e)
+            if attempt < _retries:
+                continue
+            raise ValueError(f"AI service error: {str(e)[:100]}")
+
+    raise ValueError(f"AI failed after {_retries} attempts. Last error: {last_error}")
 
 
 async def generate_psychometric_profile(

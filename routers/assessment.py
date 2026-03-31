@@ -65,15 +65,20 @@ async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict
     jd_text = "\n".join(filter(None, jd_text_blocks))
     
     # Call AI to generate test
-    raw_test_data = await generate_psychometric_mcq_test(
-        jd_text=jd_text,
-        role_title=position.get('title', 'Unknown Role'),
-        level=position.get('level', 'Mid'),
-        business_unit=position.get('business_unit', 'General'),
-        num_questions=req.num_questions,
-        question_type=req.question_type,
-        distribution=req.distribution
-    )
+    try:
+        raw_test_data = await generate_psychometric_mcq_test(
+            jd_text=jd_text,
+            role_title=position.get('title', 'Unknown Role'),
+            level=position.get('level', 'Mid'),
+            business_unit=position.get('business_unit', 'General'),
+            num_questions=req.num_questions,
+            question_type=req.question_type,
+            distribution=req.distribution
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
     
     # Sanitize AI output in case it messes up the options schema
     for q in raw_test_data.get("questions", []):
