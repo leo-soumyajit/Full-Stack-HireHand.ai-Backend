@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from bson import ObjectId
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -80,8 +80,12 @@ async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict
     except Exception as e:
         raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
     
-    # Sanitize AI output in case it messes up the options schema
+    # Sanitize AI output in case it messes up the schema
     for q in raw_test_data.get("questions", []):
+        # Fallback: AI sometimes renames 'scenario' to 'question' or 'text' for math/logic questions
+        if "scenario" not in q:
+            q["scenario"] = q.get("question") or q.get("text") or "Question text missing due to AI formatting error."
+            
         raw_options = q.get("options", [])
         sanitized_opts = []
         for i, opt in enumerate(raw_options):
@@ -260,8 +264,60 @@ class SubmissionRequest(BaseModel):
     responses: List[QuestionResponse]
     total_time_spent_ms: int
 
+async def trigger_background_ai_analysis(link: dict, submission_doc: AssessmentSubmission):
+    """Background task to run AI analysis without keeping the HTTP connection open."""
+    try:
+        cand_oid = ObjectId(link["candidate_id"])
+        pos_oid = ObjectId(link["position_id"])
+    except:
+        return
+        
+    position = await positions_collection.find_one({"_id": pos_oid})
+    test = await assessment_tests_collection.find_one({"position_id": link["position_id"]})
+    
+    if position and test:
+        jd = position.get("jd", {})
+        jd_text_blocks = [
+            position.get('title', ''), jd.get('purpose', ''),
+            *jd.get('responsibilities', []), *jd.get('skills', [])
+        ]
+        jd_text = "\n".join(filter(None, jd_text_blocks))
+        
+        try:
+            report_data = await analyze_psychometric_mcq_submission(
+                jd_text=jd_text,
+                role_title=position.get('title', 'Unknown Role'),
+                test_data=test,
+                submission_data=submission_doc.model_dump()
+            )
+            
+            new_report = FitmentReport(
+                candidate_id=link["candidate_id"],
+                position_id=link["position_id"],
+                user_id=link["user_id"],
+                trait_matrix=report_data.get("trait_matrix", []),
+                pattern_cluster=report_data.get("pattern_cluster", {}),
+                risk=report_data.get("risk", {}),
+                verdict=report_data.get("verdict", {}),
+                composite_psych_score=report_data.get("composite_psych_score", 0)
+            )
+            
+            await psychometric_reports_collection.update_one(
+                {"candidate_id": link["candidate_id"], "position_id": link["position_id"]},
+                {"$set": new_report.model_dump()},
+                upsert=True
+            )
+            
+            # Store score directly on candidate for list view
+            await candidates_collection.update_one(
+                {"_id": cand_oid},
+                {"$set": {"scores.psych": new_report.composite_psych_score / 10.0}}
+            )
+        except Exception as e:
+            print(f"Background AI evaluation failed: {e}")
+
 @router.post("/{token}/submit")
-async def submit_assessment(token: str, req: SubmissionRequest):
+async def submit_assessment(token: str, req: SubmissionRequest, background_tasks: BackgroundTasks):
     link = await assessment_links_collection.find_one({"token": token})
     if not link:
         raise HTTPException(status_code=404, detail="Invalid token")
@@ -284,53 +340,7 @@ async def submit_assessment(token: str, req: SubmissionRequest):
         upsert=True
     )
     
-    # --- Trigger AI Fitment Analysis ---
-    try:
-        cand_oid = ObjectId(link["candidate_id"])
-        pos_oid = ObjectId(link["position_id"])
-    except:
-        return {"message": "Assessment submitted but analysis failed due to invalid IDs"}
-        
-    position = await positions_collection.find_one({"_id": pos_oid})
-    test = await assessment_tests_collection.find_one({"position_id": link["position_id"]})
-    candidate = await candidates_collection.find_one({"_id": cand_oid})
-    
-    if position and test:
-        jd = position.get("jd", {})
-        jd_text_blocks = [
-            position.get('title', ''), jd.get('purpose', ''),
-            *jd.get('responsibilities', []), *jd.get('skills', [])
-        ]
-        jd_text = "\n".join(filter(None, jd_text_blocks))
-        
-        report_data = await analyze_psychometric_mcq_submission(
-            jd_text=jd_text,
-            role_title=position.get('title', 'Unknown Role'),
-            test_data=test,
-            submission_data=submission_doc.model_dump()
-        )
-        
-        new_report = FitmentReport(
-            candidate_id=link["candidate_id"],
-            position_id=link["position_id"],
-            user_id=link["user_id"],
-            trait_matrix=report_data.get("trait_matrix", []),
-            pattern_cluster=report_data.get("pattern_cluster", {}),
-            risk=report_data.get("risk", {}),
-            verdict=report_data.get("verdict", {}),
-            composite_psych_score=report_data.get("composite_psych_score", 0)
-        )
-        
-        await psychometric_reports_collection.update_one(
-            {"candidate_id": link["candidate_id"], "position_id": link["position_id"]},
-            {"$set": new_report.model_dump()},
-            upsert=True
-        )
-        
-        # Store score directly on candidate for list view
-        await candidates_collection.update_one(
-            {"_id": cand_oid},
-            {"$set": {"scores.psych": new_report.composite_psych_score / 10.0}}
-        )
+    # --- Trigger AI Fitment Analysis in Background ---
+    background_tasks.add_task(trigger_background_ai_analysis, link, submission_doc)
 
     return {"message": "Assessment submitted successfully"}
