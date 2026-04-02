@@ -4,10 +4,16 @@ Resume Screening Models — EOS-IA AI Resume Intelligence
 from pydantic import BaseModel
 from typing import Optional
 
+class SocialLinks(BaseModel):
+    linkedin: Optional[str] = None
+    github: Optional[str] = None
+    portfolio: Optional[str] = None
+
 class ResumeAnalysis(BaseModel):
     candidate_name: str
     candidate_email: Optional[str] = None
     candidate_current_role: Optional[str] = None
+    social_links: Optional[SocialLinks] = None
     resume_score: float                  # 0-10
     jd_match_percent: int               # 0-100
     strengths: list[str]

@@ -117,6 +117,7 @@ async def screen_resume(
             role_title=pos["title"],
             level=pos.get("level", "Mid"),
             business_unit=pos.get("business_unit", "General"),
+            custom_rules=pos.get("screening_rules"),
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI analysis failed: {str(e)}")
@@ -144,6 +145,21 @@ async def screen_resume(
             "WEAK FIT": "Conditional",
             "NOT SUITABLE": "No-Go",
         }
+        final_verdict = verdict_map.get(analysis.verdict, "Conditional")
+        final_stage = "Rejected" if analysis.recommended_stage == "Rejected" else "Screened"
+
+        screening_rules = pos.get("screening_rules") or {}
+        if screening_rules.get("enabled"):
+            scaled_score = resume_score * 10
+            if scaled_score >= screening_rules.get("auto_select_threshold", 80):
+                final_verdict = "Go"
+                final_stage = "Screened"
+            elif scaled_score <= screening_rules.get("auto_reject_threshold", 50):
+                final_verdict = "No-Go"
+                final_stage = "Rejected"
+            else:
+                final_verdict = "Conditional"
+                final_stage = "Screened"
 
         candidate_doc = {
             "position_id": position_id,
@@ -151,13 +167,13 @@ async def screen_resume(
             "name": analysis.candidate_name,
             "role": analysis.candidate_current_role or "Not specified",
             "email": analysis.candidate_email or "",
-            "stage": "Rejected" if analysis.recommended_stage == "Rejected" else "Screened",
+            "stage": final_stage,
             "scores": {
                 "resume": resume_score,
                 "psych": 0.0,
                 "composite": composite,
             },
-            "verdict": verdict_map.get(analysis.verdict, "Conditional"),
+            "verdict": final_verdict,
             "resume_analysis": analysis_data,
             "added_via": "resume_screen",
             "created_at": datetime.utcnow().isoformat(),

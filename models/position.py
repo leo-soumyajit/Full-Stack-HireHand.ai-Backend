@@ -13,6 +13,17 @@ class PositionL1QuestionsUpdate(BaseModel):
     questions: List[L1Question]
 
 
+class CustomSectionConfig(BaseModel):
+    name: str
+    weight_percentage: int
+
+class PositionScreeningRules(BaseModel):
+    enabled: bool = False
+    sections: List[CustomSectionConfig] = []
+    auto_select_threshold: int = 80
+    auto_reject_threshold: int = 50
+
+
 class PositionJD(BaseModel):
     purpose: str = ""
     education: List[str] = []
@@ -64,6 +75,7 @@ class PositionResponse(BaseModel):
     jd: Optional[PositionJD] = None
     jd_versions: List[JDVersion] = []
     l1_questions: List[L1Question] = []
+    screening_rules: Optional[PositionScreeningRules] = None
     candidates_count: int = 0
     shortlisted_count: int = 0
     risk_flag: Optional[str] = None

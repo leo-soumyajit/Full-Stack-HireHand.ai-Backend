@@ -435,6 +435,7 @@ async def analyze_resume(
     role_title: str,
     level: str,
     business_unit: str,
+    custom_rules: dict = None,
 ) -> dict:
     """
     AI Resume Screening — analyzes a resume against the position JD.
@@ -449,12 +450,16 @@ Rules:
 - Do NOT give generic feedback — tie every point to THIS EXACT role
 - Extract the candidate's name and email from the resume text if present
 - Be honest about gaps — do not inflate scores
+- CRITICAL: For social links (github), DO NOT guess, makeup, or hallucinate URLs. ONLY return the link if it is EXACTLY present in the text. If absent, you MUST return null.
 
 Return ONLY valid JSON in this exact structure:
 {
   "candidate_name": "Full name extracted from resume, or 'Unknown Candidate' if not found",
   "candidate_email": "email@domain.com or null",
   "candidate_current_role": "Current job title and company from resume, or null",
+  "social_links": {
+    "github": "EXTRACT EXACT FULL GitHub URL from text. DO NOT GUESS. If none, return null"
+  },
   "resume_score": 7.8,
   "jd_match_percent": 78,
   "strengths": [
@@ -476,6 +481,20 @@ verdict must be exactly one of: STRONG FIT | POTENTIAL FIT | WEAK FIT | NOT SUIT
 recommended_stage must be exactly one of: Screened | Interview L1 | Interview L2 | Rejected
 resume_score is 0-10 (not inflated — 10 means near-perfect match)
 jd_match_percent is 0-100"""
+
+    if custom_rules and custom_rules.get("enabled"):
+        sections = custom_rules.get("sections", [])
+        if sections:
+            weights_text = "\n".join(f"- {s['name']}: {s['weight_percentage']}% weight" for s in sections)
+            system_prompt += f"""\n\nCRITICAL HR EVALUATION RULES IN EFFECT:
+The hiring manager has overridden default scoring. You MUST calculate `resume_score` exactly according to the following weighted sections:
+{weights_text}
+
+SCORING FORMULA (Crucial for Mathematical Accuracy):
+1. Evaluate the candidate independently out of 10 for each defined section.
+2. Multiply each score by its equivalent decimal weight (e.g., if weight is 40%, multiply by 0.4).
+3. Sum these weighted values together to get the final `resume_score` (must be a float between 0.0 and 10.0). Example: (8 * 0.4) + (7 * 0.6) = 7.4.
+4. The final `resume_score` MUST strictly use this computed average. Do not inflate it."""
 
     user_prompt = f"""ROLE TO FILL:
 Title: {role_title}

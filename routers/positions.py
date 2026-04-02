@@ -8,7 +8,8 @@ import string
 from database import positions_collection, candidates_collection
 from models.position import (
     PositionCreate, PositionUpdate, PositionStatusUpdate,
-    PositionJDUpdate, PositionResponse, PositionL1QuestionsUpdate
+    PositionJDUpdate, PositionResponse, PositionL1QuestionsUpdate,
+    PositionScreeningRules
 )
 from core.deps import get_current_user
 
@@ -34,6 +35,7 @@ def _doc_to_response(doc: dict) -> PositionResponse:
         jd=doc.get("jd"),
         jd_versions=doc.get("jd_versions", []),
         l1_questions=doc.get("l1_questions", []),
+        screening_rules=doc.get("screening_rules"),
         candidates_count=doc.get("candidates_count", 0),
         shortlisted_count=doc.get("shortlisted_count", 0),
         risk_flag=doc.get("risk_flag"),
@@ -60,6 +62,23 @@ async def get_positions(
     cursor = positions_collection.find(query).sort("updated_at", -1)
     docs = await cursor.to_list(length=500)
     return [_doc_to_response(d) for d in docs]
+
+
+@router.get("/{position_id}", response_model=PositionResponse)
+async def get_position(
+    position_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific position by ID."""
+    try:
+        oid = ObjectId(position_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid position ID format")
+        
+    doc = await positions_collection.find_one({"_id": oid, "user_id": current_user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Position not found")
+    return _doc_to_response(doc)
 
 
 @router.post("/", response_model=PositionResponse, status_code=status.HTTP_201_CREATED)
@@ -197,3 +216,31 @@ def _validate_oid(oid_str: str) -> ObjectId:
         return ObjectId(oid_str)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid position ID format")
+
+@router.put("/{position_id}/screening-rules", response_model=PositionResponse)
+async def update_screening_rules(
+    position_id: str,
+    rules: PositionScreeningRules,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update custom AI screening rules for a position."""
+    oid = _validate_oid(position_id)
+    
+    if rules.enabled and rules.sections:
+        total_weight = sum(s.weight_percentage for s in rules.sections)
+        if total_weight != 100:
+            raise HTTPException(status_code=400, detail=f"Weights must sum to 100. Current sum: {total_weight}")
+
+    result = await positions_collection.find_one_and_update(
+        {"_id": oid, "user_id": current_user["id"]},
+        {"$set": {
+            "screening_rules": rules.model_dump(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        return_document=True
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Position not found")
+        
+    return _doc_to_response(result)
