@@ -192,3 +192,49 @@ def send_rejection_email(to_email: str, candidate_name: str, position_title: str
         print(f"✅ Real email successfully sent to {to_email}")
     except Exception as e:
         print(f"❌ Failed to send real email: {e}")
+
+def send_password_reset_email(to_email: str, candidate_name: str, reset_link: str):
+    """
+    Sends a password reset email.
+    Requires SMTP credentials in the environment.
+    """
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print("\n⚠️ [WARNING] SMTP_USERNAME or SMTP_PASSWORD not found in .env.")
+        print(f"⚠️ Could not send real email to {to_email}. Please add credentials.")
+        return
+    
+    msg = EmailMessage()
+    msg['Subject'] = "Reset Your Password - HireHand AI"
+    msg['From'] = f"HireHand AI <{SMTP_USERNAME}>"
+    msg['To'] = to_email
+    
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-w-2xl mx-auto p-4 border border-gray-200 rounded-lg">
+            <h2 style="color: #4F46E5;">Password Reset Request</h2>
+            <p>Hi <strong>{candidate_name}</strong>,</p>
+            <p>We received a request to reset your password for your HireHand AI account.</p>
+            <p>Click the button below to set a new password. This link will expire in 15 minutes.</p>
+            <div style="margin: 25px 0;">
+                <a href="{reset_link}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Reset Password</a>
+            </div>
+            <p style="font-size: 14px; color: #666;">If you didn't request a password reset, you can safely ignore this email.</p>
+            <br/>
+            <p style="font-size: 14px; color: #666;">Best regards,<br/>HireHand Team</p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    msg.set_content("Please enable HTML to view this message.")
+    msg.add_alternative(html_content, subtype='html')
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ Password reset email successfully sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Failed to send password reset email: {e}")
