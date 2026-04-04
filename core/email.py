@@ -1,6 +1,12 @@
 import smtplib
 from email.message import EmailMessage
 import os
+import socket
+
+# Render sometimes tries IPv6 for smtp.gmail.com and fails with Errno 101. Force IPv4.
+class IPv4SMTP(smtplib.SMTP):
+    def _get_socket(self, host, port, timeout):
+        return socket.create_connection((host, port), timeout, socket.AF_INET)
 
 # To make this work, the user MUST set SMTP_USERNAME and SMTP_PASSWORD in their .env
 SMTP_SERVER = "smtp.gmail.com"
@@ -50,7 +56,8 @@ def send_interview_email(to_email: str, candidate_name: str, position_title: str
     msg.add_alternative(html_content, subtype='html')
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        # Use our IPv4 patched SMTP class
+        with IPv4SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
@@ -99,7 +106,7 @@ def send_verification_email(to_email: str, otp: str, name: str):
     msg.add_alternative(html_content, subtype='html')
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with IPv4SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
@@ -148,7 +155,7 @@ def send_assessment_email(to_email: str, candidate_name: str, position_title: st
     msg.add_alternative(html_content, subtype='html')
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with IPv4SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
@@ -191,7 +198,7 @@ def send_shortlisted_email(to_email: str, candidate_name: str, position_title: s
     msg.add_alternative(html_content, subtype='html')
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with IPv4SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
@@ -234,7 +241,7 @@ def send_rejection_email(to_email: str, candidate_name: str, position_title: str
     msg.add_alternative(html_content, subtype='html')
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with IPv4SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
@@ -280,7 +287,7 @@ def send_password_reset_email(to_email: str, candidate_name: str, reset_link: st
     msg.add_alternative(html_content, subtype='html')
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with IPv4SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
