@@ -266,3 +266,64 @@ async def delete_analysis(
 
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Analysis not found")
+
+
+@router.post("/retry/{analysis_id}")
+async def retry_analysis(
+    analysis_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    """Retry a failed analysis with the current API key."""
+    try:
+        doc = await interview_analyses_collection.find_one({
+            "_id": ObjectId(analysis_id),
+            "user_id": current_user["id"],
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid analysis ID")
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    if doc.get("status") not in ("failed", "error"):
+        raise HTTPException(status_code=400, detail=f"Analysis status is '{doc.get('status')}', not 'failed'. Cannot retry.")
+
+    # Reset status to processing
+    await interview_analyses_collection.update_one(
+        {"_id": ObjectId(analysis_id)},
+        {"$set": {
+            "status": "processing",
+            "error": None,
+            "parsed_transcript": None,
+            "competency_analysis": None,
+            "interviewer_report": None,
+            "candidate_report": None,
+            "interviewer_quality": None,
+            "overall_score": None,
+            "verdict": None,
+        }}
+    )
+
+    # Get position for JD text
+    position = await positions_collection.find_one({"_id": ObjectId(doc["position_id"])})
+    jd_text = _build_jd_text(position) if position else ""
+
+    # Re-trigger analysis
+    background_tasks.add_task(
+        _run_analysis_bg,
+        analysis_id=analysis_id,
+        transcript=doc.get("transcript", ""),
+        jd_text=jd_text,
+        role_title=doc.get("position_title", "Unknown"),
+        candidate_name=doc.get("candidate_name", "Unknown"),
+        duration_seconds=doc.get("duration_seconds", 0),
+    )
+
+    print(f"🔄 [InterviewIQ] Retrying analysis {analysis_id} for {doc.get('candidate_name')}")
+
+    return {
+        "id": analysis_id,
+        "status": "processing",
+        "message": "Analysis retry started.",
+    }
