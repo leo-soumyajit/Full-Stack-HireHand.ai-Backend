@@ -14,12 +14,16 @@ from bson import ObjectId
 import cloudinary
 import cloudinary.uploader
 from fastapi import UploadFile, File
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure Cloudinary
 cloudinary.config( 
-  cloud_name = "di5i72sy9", 
-  api_key = "572758113724938", 
-  api_secret = "LBnZ_kEVCCCRJ5B63jN2hcZ226k",
+  cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "di5i72sy9"), 
+  api_key = os.getenv("CLOUDINARY_API_KEY", "572758113724938"), 
+  api_secret = os.getenv("CLOUDINARY_API_SECRET", "LBnZ_kEVCCCRJ5B63jN2hcZ226k"),
   secure = True
 )
 
