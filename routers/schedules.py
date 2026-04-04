@@ -86,18 +86,17 @@ async def create_schedule(
     dt_ist = dt_utc.astimezone(ist_tz)
     ist_str = dt_ist.strftime("%d %b %Y, %I:%M %p (IST)")
 
+    # Generate HireHand Interview Room Link for the Candidate
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8080").rstrip("/")
+    hirehand_candidate_link = f"{frontend_url}/interview/{room_id}?role=guest"
+
     # Log Email Dispatch
     print(f"==================================================")
     print(f"📧 [EMAIL DISPATCH TRIGGERED] To: {candidate.get('email')}")
     print(f"📝 Subject: Interview Invitation: {position.get('title')}")
     print(f"🕒 Scheduled At: {ist_str}")
-    print(f"🔗 Meeting Link: {meeting_link}")
-    print(f"🎥 HireHand Room: /interview/{room_id}")
+    print(f"🔗 Meeting Link: {hirehand_candidate_link}")
     print(f"==================================================")
-
-    # Generate HireHand Interview Room Link for the Candidate
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8080").rstrip("/")
-    hirehand_candidate_link = f"{frontend_url}/interview/{room_id}?role=guest"
 
     # Queue Real Email
     background_tasks.add_task(

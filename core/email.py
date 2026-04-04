@@ -6,7 +6,13 @@ import socket
 # Render sometimes tries IPv6 for smtp.gmail.com and fails with Errno 101. Force IPv4.
 class IPv4SMTP(smtplib.SMTP):
     def _get_socket(self, host, port, timeout):
-        return socket.create_connection((host, port), timeout, socket.AF_INET)
+        info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        af, socktype, proto, canonname, sa = info[0]
+        s = socket.socket(af, socktype, proto)
+        if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+            s.settimeout(timeout)
+        s.connect(sa)
+        return s
 
 # To make this work, the user MUST set SMTP_USERNAME and SMTP_PASSWORD in their .env
 SMTP_SERVER = "smtp.gmail.com"
