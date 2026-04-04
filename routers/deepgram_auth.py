@@ -5,8 +5,8 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
-DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "2c72b231c4d5ca80ba100d1467fbadea98e25d79")
-DEEPGRAM_PROJECT_ID = "02f34869-64b0-4e93-9ff8-8423f82198cd"
+DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
+DEEPGRAM_PROJECT_ID = os.getenv("DEEPGRAM_PROJECT_ID", "")
 
 class TokenResponse(BaseModel):
     key: str
