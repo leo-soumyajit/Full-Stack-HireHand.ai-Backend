@@ -58,6 +58,55 @@ def send_interview_email(to_email: str, candidate_name: str, position_title: str
     except Exception as e:
         print(f"❌ Failed to send real email: {e}")
 
+def send_verification_email(to_email: str, otp: str, name: str):
+    """
+    Sends an OTP verification email.
+    """
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print("\n⚠️ [WARNING] SMTP_USERNAME or SMTP_PASSWORD not found in .env.")
+        print(f"⚠️ Fake-sent OTP {otp} to {to_email}")
+        return
+        
+    msg = EmailMessage()
+    msg['Subject'] = "Verify your HireHand AI Account"
+    msg['From'] = f"HireHand AI <{SMTP_USERNAME}>"
+    msg['To'] = to_email
+    
+    html_content = f"""
+    <html>
+      <body style="font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #fafafa; padding: 20px;">
+        <div style="max-w-xl mx-auto p-8 border border-gray-100 rounded-2xl bg-white shadow-sm">
+            <h2 style="color: #4F46E5; margin-top: 0;">Identity Verification</h2>
+            <p>Hi <strong>{name}</strong>,</p>
+            <p>Welcome to <strong>HireHand AI</strong>! To complete your registration and secure your account, please enter the following 6-digit verification code:</p>
+            
+            <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; padding: 24px; border-radius: 12px; margin: 30px 0; text-align: center;">
+                <p style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #0f172a;">{otp}</p>
+            </div>
+            
+            <p style="color: #64748b; font-size: 14px;">If you didn't attempt to create an account, you can safely ignore this email.</p>
+            <br/>
+            <p style="font-size: 14px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+              Securely,<br/>
+              <strong>HireHand System AI</strong>
+            </p>
+        </div>
+      </body>
+    </html>
+    """
+    
+    msg.set_content(f"Your OTP code is: {otp}")
+    msg.add_alternative(html_content, subtype='html')
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ Real OTP email sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Failed to send OTP email: {e}")
+
 def send_assessment_email(to_email: str, candidate_name: str, position_title: str, assessment_url: str, time_limit: int):
     """
     Sends an actual email to the candidate with the psychometric assessment link.
