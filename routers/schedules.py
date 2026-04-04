@@ -3,6 +3,7 @@ from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from typing import List
 import uuid
+import os
 
 from database import schedules_collection, candidates_collection, positions_collection
 from models.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
@@ -94,6 +95,10 @@ async def create_schedule(
     print(f"🎥 HireHand Room: /interview/{room_id}")
     print(f"==================================================")
 
+    # Generate HireHand Interview Room Link for the Candidate
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8080").rstrip("/")
+    hirehand_candidate_link = f"{frontend_url}/interview/{room_id}?role=guest"
+
     # Queue Real Email
     background_tasks.add_task(
         send_interview_email,
@@ -101,7 +106,7 @@ async def create_schedule(
         candidate_name=candidate.get("name"),
         position_title=position.get("title"),
         scheduled_time_ist=ist_str,
-        meeting_link=meeting_link
+        meeting_link=hirehand_candidate_link
     )
 
     # 4. Insert Schedule Doc
