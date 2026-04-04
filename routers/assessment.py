@@ -28,7 +28,7 @@ from core.openrouter import (
     generate_psychometric_mcq_test,
     analyze_psychometric_mcq_submission
 )
-from core.email import send_assessment_email
+from core.resend_email import send_assessment_email
 from core.deps import get_current_user
 
 router = APIRouter()

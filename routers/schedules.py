@@ -8,7 +8,7 @@ import os
 from database import schedules_collection, candidates_collection, positions_collection
 from models.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from core.deps import get_current_user
-from core.email import send_interview_email
+from core.resend_email import send_interview_email
 
 router = APIRouter()
 

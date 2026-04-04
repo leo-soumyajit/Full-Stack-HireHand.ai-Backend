@@ -93,7 +93,7 @@ async def send_bulk_emails(
     cursor = candidates_collection.find({"_id": {"$in": cand_oids}, "user_id": current_user["id"]})
     candidates = await cursor.to_list(length=1000)
     
-    from core.email import send_shortlisted_email, send_rejection_email
+    from core.resend_email import send_shortlisted_email, send_rejection_email
     
     sent_count = 0
     for cand in candidates:

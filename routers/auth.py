@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr
 from database import user_collection
 from core.security import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from models.user import UserCreate, UserInDB, Token, UserResponse
-from core.email import send_password_reset_email, send_verification_email
+from core.resend_email import send_password_reset_email, send_verification_email
 import os
 import random
 from datetime import timedelta, datetime, timezone
