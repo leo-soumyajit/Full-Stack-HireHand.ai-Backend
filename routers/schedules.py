@@ -24,6 +24,7 @@ def _doc_to_response(doc: dict, candidate: dict, position: dict) -> ScheduleResp
         position_title=position.get("title", "Unknown Position"),
         scheduled_at=doc.get("scheduled_at", ""),
         meeting_link=doc.get("meeting_link", ""),
+        room_id=doc.get("room_id"),
         status=doc.get("status", "Scheduled"),
         created_at=doc.get("created_at", ""),
     )
@@ -75,6 +76,7 @@ async def create_schedule(
     # 3. Create Meeting Link & Email Action
     meet_id = str(uuid.uuid4())[:10]
     meeting_link = f"https://meet.jit.si/HireHand-Interview-{meet_id}"
+    room_id = f"hh-{meet_id}"
 
     # UTC to IST Formatting for Email & Logs
     # body.scheduled_at looks like "2026-03-12T20:40:00.000Z"
@@ -89,6 +91,7 @@ async def create_schedule(
     print(f"📝 Subject: Interview Invitation: {position.get('title')}")
     print(f"🕒 Scheduled At: {ist_str}")
     print(f"🔗 Meeting Link: {meeting_link}")
+    print(f"🎥 HireHand Room: /interview/{room_id}")
     print(f"==================================================")
 
     # Queue Real Email
@@ -108,6 +111,7 @@ async def create_schedule(
         "user_id": current_user["id"],
         "scheduled_at": body.scheduled_at,
         "meeting_link": meeting_link,
+        "room_id": room_id,
         "status": "Scheduled",
         "created_at": datetime.now(timezone.utc).isoformat()
     }

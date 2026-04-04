@@ -25,5 +25,6 @@ class ScheduleResponse(BaseModel):
     position_title: str
     scheduled_at: str
     meeting_link: str
+    room_id: Optional[str] = None
     status: str  # "Scheduled", "Completed", "Cancelled"
     created_at: str

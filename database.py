@@ -26,6 +26,9 @@ assessment_submissions_collection = database.get_collection("assessment_submissi
 # Schedules Collection
 schedules_collection = database.get_collection("schedules")
 
+# InterviewIQ — AI Interview Intelligence
+interview_analyses_collection = database.get_collection("interview_analyses")
+
 
 async def init_db():
     """Create all indexes on startup for O(1) / low-latency queries."""
@@ -60,3 +63,8 @@ async def init_db():
     # Schedules
     await schedules_collection.create_index([("user_id", 1), ("scheduled_at", 1)])
     await schedules_collection.create_index([("candidate_id", 1)])
+
+    # InterviewIQ — AI Interview Intelligence
+    await interview_analyses_collection.create_index([("schedule_id", 1)], unique=True)
+    await interview_analyses_collection.create_index([("position_id", 1), ("user_id", 1)])
+    await interview_analyses_collection.create_index([("candidate_id", 1)])
