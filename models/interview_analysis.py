@@ -26,6 +26,10 @@ class InterviewAnalysisResponse(BaseModel):
     created_at: str
 
     # Populated after AI analysis completes
+    overall_score: Optional[float] = None
+    verdict: Optional[str] = None
+    parsed_transcript: Optional[dict] = None
+    competency_analysis: Optional[dict] = None
     interviewer_report: Optional[dict] = None
     candidate_report: Optional[dict] = None
     interviewer_quality: Optional[dict] = None
