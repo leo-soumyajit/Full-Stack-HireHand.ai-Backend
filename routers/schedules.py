@@ -195,3 +195,36 @@ async def update_schedule(
     position = await positions_collection.find_one({"_id": ObjectId(result["position_id"])})
 
     return _doc_to_response(result, candidate or {}, position or {})
+
+
+@router.get("/{schedule_id}/questions")
+async def get_schedule_questions(schedule_id: str):
+    """
+    Public endpoint — returns pre-generated interview questions for the scheduled
+    interview's position.  The InterviewRoom page calls this so the host can view
+    the question bank while interviewing. No auth required because the room link
+    itself is the access token.
+    """
+    try:
+        schedule = await schedules_collection.find_one({"_id": ObjectId(schedule_id)})
+    except Exception:
+        return {"questions": [], "position_title": ""}
+
+    if not schedule:
+        return {"questions": [], "position_title": ""}
+
+    try:
+        position = await positions_collection.find_one(
+            {"_id": ObjectId(schedule["position_id"])}
+        )
+    except Exception:
+        return {"questions": [], "position_title": ""}
+
+    if not position:
+        return {"questions": [], "position_title": ""}
+
+    return {
+        "questions": position.get("l1_questions", []),
+        "position_title": position.get("title", ""),
+    }
+
