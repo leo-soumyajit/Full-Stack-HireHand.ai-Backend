@@ -135,6 +135,7 @@ async def end_interview(
         "position_title": position.get("title", "Unknown"),
         "transcript": body.transcript,
         "duration_seconds": body.duration_seconds,
+        "tab_switch_count": body.tab_switch_count,
         "status": "processing",
         "created_at": datetime.now(timezone.utc).isoformat(),
         # Populated by background task
@@ -211,7 +212,7 @@ async def list_analyses_for_position(
     ]
 
 
-@router.get("/{analysis_id}")
+@router.get("/{analysis_id}", response_model=InterviewAnalysisResponse)
 async def get_analysis(
     analysis_id: str,
     current_user: dict = Depends(get_current_user),
@@ -246,6 +247,7 @@ async def get_analysis(
         "interviewer_report": doc.get("interviewer_report"),
         "candidate_report": doc.get("candidate_report"),
         "interviewer_quality": doc.get("interviewer_quality"),
+        "tab_switch_count": doc.get("tab_switch_count", 0),
         "error": doc.get("error"),
     }
 

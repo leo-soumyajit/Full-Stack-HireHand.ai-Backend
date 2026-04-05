@@ -9,6 +9,7 @@ class EndInterviewRequest(BaseModel):
     schedule_id: str
     transcript: str = Field(..., min_length=10, description="Full interview transcript")
     duration_seconds: int = Field(..., ge=0, description="Total interview duration in seconds")
+    tab_switch_count: int = Field(default=0, description="Number of times the candidate switched tabs")
 
 
 class InterviewAnalysisResponse(BaseModel):
@@ -28,6 +29,7 @@ class InterviewAnalysisResponse(BaseModel):
     interviewer_report: Optional[dict] = None
     candidate_report: Optional[dict] = None
     interviewer_quality: Optional[dict] = None
+    tab_switch_count: Optional[int] = None
     error: Optional[str] = None
 
 
