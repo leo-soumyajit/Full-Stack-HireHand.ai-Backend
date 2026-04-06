@@ -41,6 +41,7 @@ class InterviewAnalysisListItem(BaseModel):
     """Compact item for listing analyses."""
     id: str
     schedule_id: str
+    candidate_id: str
     candidate_name: str
     position_title: str
     status: str

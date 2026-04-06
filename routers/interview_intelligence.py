@@ -200,6 +200,7 @@ async def list_analyses_for_position(
         InterviewAnalysisListItem(
             id=str(d["_id"]),
             schedule_id=d.get("schedule_id", ""),
+            candidate_id=d.get("candidate_id", ""),
             candidate_name=d.get("candidate_name", "Unknown"),
             position_title=d.get("position_title", "Unknown"),
             status=d.get("status", "processing"),
