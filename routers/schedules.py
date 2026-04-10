@@ -26,6 +26,7 @@ def _doc_to_response(doc: dict, candidate: dict, position: dict) -> ScheduleResp
         scheduled_at=doc.get("scheduled_at", ""),
         meeting_link=doc.get("meeting_link", ""),
         room_id=doc.get("room_id"),
+        interview_round=doc.get("interview_round", 1),
         status=doc.get("status", "Scheduled"),
         created_at=doc.get("created_at", ""),
     )
@@ -74,7 +75,14 @@ async def create_schedule(
                 {"$set": {"status": "Completed"}}
             )
 
-    # 3. Create Meeting Link & Email Action
+    # 3. Auto-compute interview round (L1, L2, L3...) for this candidate
+    previous_count = await schedules_collection.count_documents({
+        "candidate_id": body.candidate_id,
+        "status": {"$ne": "Cancelled"},  # Don't count cancelled interviews
+    })
+    interview_round = previous_count + 1  # 1st interview = L1, 2nd = L2, etc.
+
+    # 4. Create Meeting Link & Email Action
     meet_id = str(uuid.uuid4())[:10]
     meeting_link = f"https://meet.jit.si/HireHand-Interview-{meet_id}"
     room_id = f"hh-{meet_id}"
@@ -108,7 +116,7 @@ async def create_schedule(
         meeting_link=hirehand_candidate_link
     )
 
-    # 4. Insert Schedule Doc
+    # 5. Insert Schedule Doc
     doc = {
         "candidate_id": body.candidate_id,
         "position_id": body.position_id,
@@ -116,16 +124,17 @@ async def create_schedule(
         "scheduled_at": body.scheduled_at,
         "meeting_link": meeting_link,
         "room_id": room_id,
+        "interview_round": interview_round,
         "status": "Scheduled",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await schedules_collection.insert_one(doc)
     doc["_id"] = result.inserted_id
 
-    # 5. Automatically update candidate stage to "Interview L1"
+    # 6. Automatically update candidate stage to "Interview L{round}"
     await candidates_collection.update_one(
         {"_id": cand_oid},
-        {"$set": {"stage": "Interview L1"}}
+        {"$set": {"stage": f"Interview L{interview_round}"}}
     )
 
     return _doc_to_response(doc, candidate, position)

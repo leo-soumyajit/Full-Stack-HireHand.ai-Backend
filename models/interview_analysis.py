@@ -34,6 +34,7 @@ class InterviewAnalysisResponse(BaseModel):
     candidate_report: Optional[dict] = None
     interviewer_quality: Optional[dict] = None
     tab_switch_count: Optional[int] = None
+    interview_round: Optional[int] = None
     error: Optional[str] = None
 
 
@@ -49,3 +50,4 @@ class InterviewAnalysisListItem(BaseModel):
     created_at: str
     overall_score: Optional[float] = None
     verdict: Optional[str] = None
+    interview_round: Optional[int] = None

@@ -136,6 +136,7 @@ async def end_interview(
         "transcript": body.transcript,
         "duration_seconds": body.duration_seconds,
         "tab_switch_count": body.tab_switch_count,
+        "interview_round": schedule.get("interview_round", 1),
         "status": "processing",
         "created_at": datetime.now(timezone.utc).isoformat(),
         # Populated by background task
@@ -208,6 +209,7 @@ async def list_analyses_for_position(
             created_at=d.get("created_at", ""),
             overall_score=d.get("overall_score"),
             verdict=d.get("verdict"),
+            interview_round=d.get("interview_round"),
         )
         for d in docs
     ]
@@ -249,6 +251,7 @@ async def get_analysis(
         "candidate_report": doc.get("candidate_report"),
         "interviewer_quality": doc.get("interviewer_quality"),
         "tab_switch_count": doc.get("tab_switch_count", 0),
+        "interview_round": doc.get("interview_round"),
         "error": doc.get("error"),
     }
 

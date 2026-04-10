@@ -26,5 +26,6 @@ class ScheduleResponse(BaseModel):
     scheduled_at: str
     meeting_link: str
     room_id: Optional[str] = None
+    interview_round: int = 1  # L1=1, L2=2, L3=3, ...
     status: str  # "Scheduled", "Completed", "Cancelled"
     created_at: str
