@@ -68,3 +68,15 @@ async def init_db():
     await interview_analyses_collection.create_index([("schedule_id", 1)], unique=True)
     await interview_analyses_collection.create_index([("position_id", 1), ("user_id", 1)])
     await interview_analyses_collection.create_index([("candidate_id", 1)])
+
+    # ── One-time migration: backfill interview_round for old data ──
+    migrated_schedules = await schedules_collection.update_many(
+        {"interview_round": {"$exists": False}},
+        {"$set": {"interview_round": 1}}
+    )
+    migrated_analyses = await interview_analyses_collection.update_many(
+        {"interview_round": {"$exists": False}},
+        {"$set": {"interview_round": 1}}
+    )
+    if migrated_schedules.modified_count > 0 or migrated_analyses.modified_count > 0:
+        print(f"📦 Migration: backfilled interview_round=1 → {migrated_schedules.modified_count} schedules, {migrated_analyses.modified_count} analyses")
