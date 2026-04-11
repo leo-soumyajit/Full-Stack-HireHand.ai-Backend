@@ -21,12 +21,12 @@ from models.interview_analysis import (
 from core.deps import get_current_user
 from core.interview_intelligence import run_full_analysis_pipeline
 from core.resend_email import send_interview_report_email
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 router = APIRouter()
 
 class SendReportRequest(BaseModel):
-    to_email: EmailStr
+    to_email: str
     subject: str = ""
     message_body: str = ""
     sender_name: str
@@ -368,9 +368,12 @@ async def send_analysis_report(
     if "base64," in pdf_base64:
         pdf_base64 = pdf_base64.split("base64,")[1]
 
+    # Handle multiple emails
+    to_emails = [e.strip() for e in payload.to_email.split(",") if e.strip()]
+
     try:
         send_interview_report_email(
-            to_email=payload.to_email,
+            to_email=to_emails,
             subject=payload.subject,
             message_body=payload.message_body,
             candidate_name=doc.get("candidate_name", "Candidate"),
