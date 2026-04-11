@@ -135,39 +135,47 @@ def _extract_json(content: str) -> str:
 # ══════════════════════════════════════════════════════════════════════
 async def parse_transcript(raw_transcript: str) -> dict:
     """Parse raw transcript into structured Q&A pairs with speaker labels."""
-    system_prompt = """You are an expert interview transcript parser. Your task is to take a raw interview transcript and structure it into clear question-answer pairs.
+    system_prompt = """You are an expert interview transcript parser. Your ONLY job is to extract REAL question-answer pairs that ACTUALLY EXIST in the transcript.
 
-Rules:
-1. Identify who is the INTERVIEWER and who is the CANDIDATE based on context clues (who asks questions vs who answers)
-2. Extract each question asked by the interviewer and the candidate's corresponding answer
-3. Preserve the natural conversation flow
-4. If the transcript is informal or partially captured, do your best to structure it
-5. Estimate confidence of speaker identification
+CRITICAL RULES — FOLLOW STRICTLY:
+1. The transcript may already contain explicit role labels like "Interviewer:" and "Candidate:". If present, TRUST these labels completely. Do NOT re-identify or swap speakers.
+2. If no labels exist, identify speakers from context: the person asking short probing questions is the INTERVIEWER, the person giving longer descriptive answers is the CANDIDATE.
+3. Extract ONLY questions and answers that ACTUALLY APPEAR in the transcript text. Do NOT invent, infer, or fabricate any Q&A pairs.
+4. If a question was asked but the candidate gave no meaningful answer (just greetings, noise, or off-topic response), record the answer as "No substantive answer provided."
+5. Do NOT reverse speaker roles midway through the transcript.
+6. Combine fragmented sentences from the same speaker into coherent thoughts.
+
+TRANSCRIPT QUALITY ASSESSMENT — Be brutally honest:
+- HIGH: Clear back-and-forth interview with substantive technical/behavioral questions and detailed answers.
+- MEDIUM: Some interview content but mixed with small talk, partial answers, or audio issues.
+- LOW: Mostly greetings, small talk, or fragmented speech with very few real interview questions.
+- INVALID: No real interview occurred. Transcript contains only noise, greetings, non-interview conversation, test audio, or gibberish. If INVALID, return parsed_qa as an EMPTY array [].
 
 Return ONLY valid JSON:
 {
   "parsed_qa": [
     {
       "question_number": 1,
-      "interviewer_question": "The question asked by the interviewer",
-      "candidate_answer": "The candidate's answer",
+      "interviewer_question": "The EXACT question from the transcript",
+      "candidate_answer": "The EXACT answer from the transcript",
       "topic_category": "Technical | Behavioral | Situational | General | Introduction | Closing"
     }
   ],
-  "total_questions": 8,
-  "total_duration_estimate": "Based on transcript length, estimate interview duration",
-  "conversation_quality": "HIGH | MEDIUM | LOW — based on depth, back-and-forth, and specificity",
-  "key_topics_discussed": ["topic1", "topic2", "topic3"],
+  "total_questions": 0,
+  "total_duration_estimate": "Estimate based on transcript length",
+  "conversation_quality": "HIGH | MEDIUM | LOW | INVALID",
+  "key_topics_discussed": [],
   "speaker_identification_confidence": "HIGH | MEDIUM | LOW"
 }"""
 
-    user_prompt = f"""Parse this interview transcript into structured Q&A pairs:
+    user_prompt = f"""Parse this interview transcript into structured Q&A pairs.
+IMPORTANT: Only extract Q&A that ACTUALLY EXISTS in the text. If no real interview happened, return an empty parsed_qa array and set conversation_quality to INVALID.
 
 --- TRANSCRIPT START ---
-{raw_transcript[:8000]}
+{raw_transcript[:20000]}
 --- TRANSCRIPT END ---
 
-Extract all question-answer pairs and categorize them."""
+Extract all real question-answer pairs and categorize them."""
 
     return await _call_interview_llm(system_prompt, user_prompt)
 
@@ -179,46 +187,54 @@ async def analyze_competencies(parsed_qa: dict, jd_text: str, role_title: str) -
     """Analyze candidate competencies based on their interview answers mapped to JD requirements."""
     system_prompt = """You are an elite talent assessment AI used by McKinsey, Korn Ferry, and top executive search firms.
 
-Your task: Analyze a candidate's interview answers against a specific Job Description and produce a rigorous competency assessment.
+Your task: Analyze a candidate's ACTUAL interview answers against a specific Job Description. You must be ruthlessly evidence-based.
 
-SCORING RULES (CRITICAL):
-- Use the FULL 1.0-10.0 range with genuine variance
-- 1-3: Answers actively contradict what role demands. Clear deficiency.
-- 4-5: Weak. Some relevant experience but major gaps evident.
-- 6-7: Adequate. Meets minimum bar but not differentiated.
-- 8-9: Strong. Clear evidence of relevant expertise and behavioral fit.
-- 10: Exceptional. Rare, elite-level responses with concrete evidence.
-- DO NOT cluster all scores between 7-8. Use the FULL range based on evidence.
+═══ ABSOLUTE RULES — VIOLATION IS UNACCEPTABLE ═══
+
+1. EVIDENCE MUST BE VERBATIM: The "evidence" field MUST contain the candidate's EXACT words from the interview, enclosed in double quotes. Copy-paste their actual words. Do NOT paraphrase, summarize, or fabricate what they said.
+2. NO EVIDENCE = SCORE 0: If the candidate did NOT discuss a particular skill or competency during the interview, you MUST set the score to 0.0 and write "NOT DISCUSSED IN INTERVIEW" as evidence. Do NOT guess or infer skills they didn't demonstrate.
+3. NO SCORE CLUSTERING: Each score must be independently justified. Do NOT default all scores to the 6-8 range. If evidence is weak, score 2-4. If evidence is strong and specific, score 8-9. Score 10 only for genuinely exceptional, concrete demonstrations.
+4. SCORE ONLY WHAT WAS SAID: Judge the candidate purely on what they actually said in the interview. Do NOT assume skills based on their resume, job title, or background. Only their spoken answers count.
+5. RED FLAGS MUST BE REAL: Only flag patterns you can point to with exact transcript evidence. Do NOT invent red flags.
+6. STANDOUT MOMENTS MUST BE REAL: Only cite moments with exact quotes. If no standout moment exists, return an empty array [].
+
+═══ SCORING SCALE ═══
+- 0: Not discussed at all in the interview. No evidence available.
+- 1-3: Discussed but answers actively contradict role requirements or show clear misunderstanding.
+- 4-5: Mentioned briefly but with major gaps, vague answers, or lack of depth.
+- 6-7: Adequate demonstration with some relevant experience but not strongly differentiated.
+- 8-9: Strong, specific, detailed answers with concrete examples and clear expertise.
+- 10: Exceptional. Rare. Must have extraordinary depth with verifiable specifics.
 
 Return ONLY valid JSON:
 {
   "technical_competencies": [
     {
       "skill": "Specific technical skill from JD",
-      "score": 7.5,
-      "evidence": "Specific quote or reference from their answer that demonstrates this",
+      "score": 0.0,
+      "evidence": "EXACT quote from candidate OR 'NOT DISCUSSED IN INTERVIEW'",
       "gap": "What was missing or could be stronger"
     }
   ],
   "behavioral_competencies": [
     {
       "trait": "Leadership / Communication / Problem-Solving / etc.",
-      "score": 6.8,
-      "evidence": "Behavioral evidence from their answers",
-      "star_adherence": "Did they use STAR method? Situation-Task-Action-Result analysis"
+      "score": 0.0,
+      "evidence": "EXACT quote from candidate OR 'NOT DISCUSSED IN INTERVIEW'",
+      "star_adherence": "Did they use STAR method? Situation-Task-Action-Result analysis. If not discussed, write 'NOT ASSESSED'"
     }
   ],
   "communication_score": {
-    "clarity": 7.5,
-    "confidence": 8.0,
-    "articulation": 7.0,
-    "listening_skills": 6.5,
-    "overall": 7.3,
-    "notes": "Brief assessment of communication quality"
+    "clarity": 0.0,
+    "confidence": 0.0,
+    "articulation": 0.0,
+    "listening_skills": 0.0,
+    "overall": 0.0,
+    "notes": "Assessment based on HOW the candidate spoke — sentence structure, coherence, confidence. If insufficient data, state so."
   },
-  "red_flags": ["Any concerning patterns in answers"],
-  "standout_moments": ["Particularly impressive responses or insights"],
-  "overall_competency_score": 72
+  "red_flags": [],
+  "standout_moments": [],
+  "overall_competency_score": 0
 }"""
 
     qa_text = "\n".join(
@@ -229,14 +245,15 @@ Return ONLY valid JSON:
     user_prompt = f"""ROLE: {role_title}
 
 JOB DESCRIPTION:
-{jd_text[:3000]}
+{jd_text[:8000]}
 
 KEY TOPICS DISCUSSED: {', '.join(parsed_qa.get('key_topics_discussed', []))}
 
 INTERVIEW Q&A:
 {qa_text}
 
-Analyze the candidate's competencies against this JD. Be rigorous and evidence-based."""
+Analyze the candidate's competencies against this JD.
+REMINDER: Use ONLY verbatim quotes as evidence. Score 0 for anything not discussed. Do NOT fabricate or assume."""
 
     return await _call_interview_llm(system_prompt, user_prompt)
 
@@ -253,94 +270,108 @@ async def generate_full_reports(
     duration_seconds: int,
 ) -> dict:
     """Generate comprehensive reports for interviewer, candidate, and interviewer quality assessment."""
-    system_prompt = """You are InterviewIQ, an elite AI interview intelligence system. You produce three comprehensive reports from interview data.
+    system_prompt = """You are InterviewIQ, an elite AI interview intelligence system. You produce three comprehensive reports STRICTLY based on interview evidence.
+
+═══ ABSOLUTE RULES — APPLY TO ALL 3 REPORTS ═══
+1. EVERY claim, strength, concern, and score MUST be backed by the candidate's EXACT words from the interview (verbatim quotes in double quotes).
+2. Do NOT fabricate, infer, or assume anything the candidate did not explicitly say during the interview.
+3. If the competency data shows "NOT DISCUSSED IN INTERVIEW" for a skill, that skill MUST be listed as a gap/concern, NOT as a strength.
+4. If the majority of competencies show 0 scores or "NOT DISCUSSED", the candidate clearly did not demonstrate fitness for the role.
 
 ═══ REPORT 1: INTERVIEWER REPORT (Recruiter-Facing) ═══
-This is the hiring manager's decision document. Must be data-driven with specific evidence.
+This is the hiring manager's decision document. Must cite specific candidate quotes as evidence for every claim.
 
 ═══ REPORT 2: CANDIDATE FEEDBACK REPORT ═══
-This helps the candidate understand their performance and grow. Must be constructive yet honest.
+This helps the candidate understand their performance. Be constructive yet honest. Reference their actual answers.
 
 ═══ REPORT 3: INTERVIEWER QUALITY ASSESSMENT ═══
-This evaluates how well the INTERVIEW was conducted (question quality, coverage, fairness).
+Evaluate the actual questions that were asked. Only reference questions that exist in the Q&A data. If few questions were asked, scores must be low.
 
-═══ SCORING RULES ═══
-- role_fit_score: 0-100 based on overall alignment with JD
-- FORBIDDEN scores: 74, 75, 76 (known lazy anchors)
-- Use FULL range. A weak candidate should score 30-50, not 65.
-- A strong candidate should score 80-95, not just 75.
+═══ SCORING RULES (role_fit_score: 0-100) ═══
+- The score MUST mathematically align with the competency averages from the input data.
+- If overall competency average is below 3.0, role_fit_score MUST be below 35.
+- If overall competency average is 3.0-5.0, role_fit_score MUST be 35-55.
+- If overall competency average is 5.0-7.0, role_fit_score MUST be 55-75.
+- If overall competency average is 7.0-8.5, role_fit_score MUST be 75-88.
+- If overall competency average is above 8.5, role_fit_score MUST be 88-100.
+- FORBIDDEN: Do NOT assign scores that contradict the competency data.
 
 ═══ VERDICT RULES ═══
-- STRONG HIRE: score >= 82, no red flags, strong evidence across competencies
-- HIRE: score 70-81, minor gaps but overall positive
-- HOLD: score 55-69, significant gaps needing clarification
-- NO HIRE: score < 55, or critical red flags
+- STRONG HIRE: role_fit_score >= 82, no red flags, strong verbatim evidence across competencies
+- HIRE: role_fit_score 70-81, minor gaps but overall positive with evidence
+- HOLD: role_fit_score 55-69, significant gaps needing clarification
+- NO HIRE: role_fit_score < 55, or critical red flags, or majority of competencies not demonstrated
+
+═══ INTERVIEWER QUALITY SCORING ═══
+- question_quality_score: Based ONLY on the actual questions in the Q&A data. If questions were shallow or few, score low (1-4).
+- competency_coverage_percent: Calculate as (number of JD competencies actually tested / total JD competencies) * 100.
+- interviewer_rating: Must reflect actual interview quality. Poor coverage = low rating.
+- best_question_asked: Must be an ACTUAL question from the Q&A data. If no good questions exist, write "No standout questions identified."
 
 Return ONLY valid JSON:
 {
   "interviewer_report": {
-    "executive_summary": "3-4 sentences summarizing the candidate's overall performance and recommendation",
-    "role_fit_score": 78,
+    "executive_summary": "3-4 sentences with verbatim evidence from candidate",
+    "role_fit_score": 0,
     "verdict": "STRONG HIRE | HIRE | HOLD | NO HIRE",
-    "verdict_rationale": "3 sentences justifying the verdict with specific evidence from the interview",
+    "verdict_rationale": "3 sentences with exact candidate quotes justifying the verdict",
     "competency_summary": {
-      "technical_avg": 7.5,
-      "behavioral_avg": 6.8,
-      "communication_avg": 7.2,
-      "overall_avg": 7.2
+      "technical_avg": 0.0,
+      "behavioral_avg": 0.0,
+      "communication_avg": 0.0,
+      "overall_avg": 0.0
     },
     "key_strengths": [
-      {"strength": "Specific strength", "evidence": "What in the interview demonstrated this"}
+      {"strength": "Specific strength", "evidence": "Verbatim candidate quote demonstrating this"}
     ],
     "key_concerns": [
-      {"concern": "Specific concern", "evidence": "What raised this concern", "severity": "LOW | MEDIUM | HIGH"}
+      {"concern": "Specific concern", "evidence": "Verbatim quote or 'Not addressed in interview'", "severity": "LOW | MEDIUM | HIGH"}
     ],
-    "recommended_next_steps": ["Next step 1", "Next step 2"],
-    "salary_positioning": "Based on demonstrated experience, candidate appears to be at X level",
-    "culture_fit_assessment": "2-3 sentences on likely cultural alignment"
+    "recommended_next_steps": ["Evidence-based next step"],
+    "salary_positioning": "Based on demonstrated (not assumed) experience level",
+    "culture_fit_assessment": "Based ONLY on what candidate actually said about values, teamwork, etc."
   },
   "candidate_report": {
-    "overall_performance": "2-3 sentences — how did the candidate do overall",
-    "performance_score": 78,
+    "overall_performance": "2-3 sentences referencing their actual answers",
+    "performance_score": 0,
     "grade": "A+ | A | B+ | B | C+ | C | D | F",
     "strengths": [
-      {"area": "What they did well", "detail": "Specific feedback with actionable praise"}
+      {"area": "What they did well", "detail": "Specific feedback referencing their actual answer"}
     ],
     "improvements": [
-      {"area": "What to improve", "detail": "Actionable advice for future interviews", "priority": "HIGH | MEDIUM | LOW"}
+      {"area": "What to improve", "detail": "Actionable advice based on gaps in their actual answers", "priority": "HIGH | MEDIUM | LOW"}
     ],
     "alternative_roles": [
-      {"role": "Suggested role title", "reason": "Why this role might be a better fit based on demonstrated skills"}
+      {"role": "Suggested role title", "reason": "Why, based on skills they actually demonstrated"}
     ],
     "interview_tips": [
-      "Personalized tip 1 based on their actual performance",
-      "Personalized tip 2"
+      "Personalized tip based on their actual performance"
     ],
     "skill_development": [
       {"skill": "Specific skill to develop", "resource_suggestion": "How to develop it"}
     ]
   },
   "interviewer_quality": {
-    "question_quality_score": 7.5,
-    "competency_coverage_percent": 80,
-    "coverage_gaps": ["Competency areas from JD that were NOT assessed in the interview"],
-    "question_diversity": "HIGH | MEDIUM | LOW — Did interviewer ask varied question types?",
-    "bias_indicators": ["Any leading questions or evaluation concerns detected"],
-    "interviewer_rating": 7.8,
-    "interviewer_feedback": "2-3 sentences of constructive feedback for the interviewer",
-    "best_question_asked": "The most effective question from the interview and why",
-    "missed_opportunity": "What question SHOULD have been asked but wasn't"
+    "question_quality_score": 0.0,
+    "competency_coverage_percent": 0,
+    "coverage_gaps": ["JD competencies that were NOT tested by any question"],
+    "question_diversity": "HIGH | MEDIUM | LOW",
+    "bias_indicators": [],
+    "interviewer_rating": 0.0,
+    "interviewer_feedback": "Constructive feedback based on actual questions asked",
+    "best_question_asked": "The actual best question from the Q&A data, or 'No standout questions identified'",
+    "missed_opportunity": "What competency SHOULD have been tested but wasn't"
   }
 }"""
 
     competency_summary = f"""
-COMPETENCY DATA:
-- Technical Competencies: {json.dumps(competencies.get('technical_competencies', []), indent=2)[:1500]}
-- Behavioral Competencies: {json.dumps(competencies.get('behavioral_competencies', []), indent=2)[:1500]}
+COMPETENCY DATA (from Chain 2 analysis):
+- Technical Competencies: {json.dumps(competencies.get('technical_competencies', []), indent=2)[:4000]}
+- Behavioral Competencies: {json.dumps(competencies.get('behavioral_competencies', []), indent=2)[:4000]}
 - Communication: {json.dumps(competencies.get('communication_score', {}), indent=2)}
-- Red Flags: {competencies.get('red_flags', [])}
-- Standout Moments: {competencies.get('standout_moments', [])}
-- Overall Competency Score: {competencies.get('overall_competency_score', 'N/A')}
+- Red Flags: {json.dumps(competencies.get('red_flags', []))}
+- Standout Moments: {json.dumps(competencies.get('standout_moments', []))}
+- Overall Competency Score: {competencies.get('overall_competency_score', 0)}
 """
 
     qa_text = "\n".join(
@@ -353,20 +384,21 @@ ROLE: {role_title}
 INTERVIEW DURATION: {duration_seconds // 60} minutes
 
 JOB DESCRIPTION:
-{jd_text[:2500]}
+{jd_text[:8000]}
 
 {competency_summary}
 
 FULL INTERVIEW Q&A:
-{qa_text[:3000]}
+{qa_text[:10000]}
 
-Generate all three reports (Interviewer Report, Candidate Feedback, Interviewer Quality Assessment)."""
+Generate all three reports (Interviewer Report, Candidate Feedback, Interviewer Quality Assessment).
+REMINDER: All evidence must be verbatim quotes. All scores must align with input competency data. Do NOT fabricate anything."""
 
     return await _call_interview_llm(system_prompt, user_prompt)
 
 
 # ══════════════════════════════════════════════════════════════════════
-# MAIN PIPELINE — Runs all chains sequentially
+# MAIN PIPELINE — Runs all chains sequentially with guard rails
 # ══════════════════════════════════════════════════════════════════════
 async def run_full_analysis_pipeline(
     transcript: str,
@@ -376,8 +408,8 @@ async def run_full_analysis_pipeline(
     duration_seconds: int,
 ) -> dict:
     """
-    Run the complete InterviewIQ analysis pipeline.
-    Chain 1: Parse transcript → Chain 2: Analyze competencies → Chain 3: Generate reports.
+    Run the complete InterviewIQ analysis pipeline with quality guard rails.
+    Chain 1: Parse transcript → Quality Gate → Chain 2: Analyze competencies → Chain 3: Generate reports.
     Returns the full combined result.
     """
     print(f"🧠 [InterviewIQ] Starting analysis pipeline for {candidate_name} — {role_title}")
@@ -385,12 +417,23 @@ async def run_full_analysis_pipeline(
     # ── Chain 1: Parse Transcript ─────────────────────────────────────
     print(f"🔗 [Chain 1/3] Parsing transcript...")
     parsed_qa = await parse_transcript(transcript)
-    print(f"✅ [Chain 1/3] Parsed {parsed_qa.get('total_questions', 0)} Q&A pairs")
+    total_q = parsed_qa.get('total_questions', 0)
+    quality = parsed_qa.get('conversation_quality', 'INVALID').upper()
+    print(f"✅ [Chain 1/3] Parsed {total_q} Q&A pairs — Quality: {quality}")
+
+    # ── QUALITY GATE: Stop pipeline if transcript has no real interview ──
+    qa_list = parsed_qa.get('parsed_qa', [])
+    if quality == 'INVALID' or (total_q == 0 and len(qa_list) == 0):
+        print(f"🛑 [InterviewIQ] INVALID transcript detected — aborting pipeline for {candidate_name}")
+        raise ValueError(
+            "Insufficient interview data: The transcript does not contain a real interview. "
+            "No meaningful questions or answers were detected. Analysis cannot proceed."
+        )
 
     # ── Chain 2: Analyze Competencies ─────────────────────────────────
     print(f"🔗 [Chain 2/3] Analyzing competencies...")
     competencies = await analyze_competencies(parsed_qa, jd_text, role_title)
-    print(f"✅ [Chain 2/3] Competency analysis complete — score: {competencies.get('overall_competency_score', 'N/A')}")
+    print(f"✅ [Chain 2/3] Competency analysis complete — score: {competencies.get('overall_competency_score', 0)}")
 
     # ── Chain 3: Generate Full Reports ────────────────────────────────
     print(f"🔗 [Chain 3/3] Generating comprehensive reports...")
