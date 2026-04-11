@@ -365,8 +365,8 @@ async def send_analysis_report(
         raise HTTPException(status_code=404, detail="Analysis not found")
 
     pdf_base64 = payload.pdf_base64
-    if pdf_base64.startswith("data:application/pdf;base64,"):
-        pdf_base64 = pdf_base64.split("data:application/pdf;base64,")[1]
+    if "base64," in pdf_base64:
+        pdf_base64 = pdf_base64.split("base64,")[1]
 
     try:
         send_interview_report_email(

@@ -266,54 +266,70 @@ def send_interview_report_email(
     <html>
       <head>
         <style>
-          body {{ font-family: 'Inter', Helvetica, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #334155; }}
-          .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #f1f5f9; }}
-          .header {{ background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); padding: 30px; text-align: center; color: white; }}
-          .header h1 {{ margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }}
-          .header p {{ margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }}
+          body {{ font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }}
+          .container {{ max-width: 640px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); border: 1px solid #f1f5f9; }}
+          .header {{ background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); padding: 40px 30px; text-align: center; color: white; }}
+          .header h1 {{ margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+          .header p {{ margin: 12px 0 0 0; font-size: 15px; opacity: 0.9; font-weight: 500; }}
           .content {{ padding: 40px 30px; }}
-          .info-card {{ background-color: #f1f5f9; border-radius: 12px; padding: 20px; margin-bottom: 30px; text-align: left; display: flex; flex-direction: column; gap: 10px; }}
-          .info-row {{ display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; font-size: 14px; }}
-          .info-row:last-child {{ border-bottom: none; padding-bottom: 0; }}
-          .message-box {{ background-color: #fef8eb; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 4px 12px 12px 4px; margin-bottom: 30px; font-size: 15px; line-height: 1.6; color: #78350f; white-space: pre-wrap; }}
-          .footer {{ background-color: #f8fafc; padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8; }}
-          .sender-pill {{ display: inline-block; background-color: #e0e7ff; color: #4338ca; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-top: 20px; }}
+          .greeting {{ font-size: 18px; font-weight: 600; margin-top: 0; margin-bottom: 8px; color: #0f172a; }}
+          .intro {{ font-size: 16px; margin-bottom: 30px; color: #475569; line-height: 1.6; }}
+          
+          .grid-card {{ background-color: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 30px; border: 1px solid #e2e8f0; }}
+          .grid-row {{ display: flex; justify-content: space-between; border-bottom: 1px dashed #cbd5e1; padding-bottom: 12px; margin-bottom: 12px; font-size: 15px; }}
+          .grid-row:last-child {{ border-bottom: none; padding-bottom: 0; margin-bottom: 0; }}
+          .grid-label {{ color: #64748b; font-weight: 500; }}
+          .grid-value {{ font-weight: 700; color: #0f172a; text-align: right; }}
+          
+          .message-box {{ background: linear-gradient(to right, #fef8eb, #fffbeb); border-left: 4px solid #f59e0b; padding: 20px 24px; border-radius: 4px 12px 12px 4px; margin-bottom: 30px; font-size: 15px; line-height: 1.6; color: #92400e; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); white-space: pre-wrap; }}
+          
+          .cta-area {{ text-align: center; margin-top: 40px; margin-bottom: 20px; }}
+          .cta-text {{ font-size: 14px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
+          
+          .footer {{ background-color: #f1f5f9; padding: 30px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }}
+          .sender-pill {{ display: inline-flex; align-items: center; justify-content: center; background-color: #e0e7ff; color: #4338ca; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 2px 0 rgba(67, 56, 202, 0.1); }}
+          .brand-text {{ margin-top: 16px; font-weight: 600; color: #3b82f6; }}
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Interview Intelligence Report</h1>
-            <p>AI-Generated Assessment & Insights</p>
+            <h1>Interview Intelligence</h1>
+            <p>Comprehensive AI-Generated Evaluation</p>
           </div>
           <div class="content">
-            <p style="font-size: 16px; margin-top: 0;">Hi there,</p>
-            <p style="font-size: 16px; margin-bottom: 30px;">Attached is the detailed <strong>HireHand AI</strong> interview report for {candidate_name}.</p>
+            <h2 class="greeting">Hi there,</h2>
+            <p class="intro">Please find attached the detailed <strong>HireHand AI</strong> interview assessment report for candidate <strong>{candidate_name}</strong>.</p>
             
-            <div class="info-card">
-              <div class="info-row">
-                <strong style="color: #64748b;">Candidate</strong>
-                <span style="font-weight: 600; color: #0f172a;">{candidate_name}</span>
+            <div class="grid-card">
+              <div class="grid-row">
+                <span class="grid-label">Candidate Name</span>
+                <span class="grid-value">{candidate_name}</span>
               </div>
-              <div class="info-row">
-                <strong style="color: #64748b;">Position</strong>
-                <span style="font-weight: 600; color: #0f172a;">{position_title}</span>
+              <div class="grid-row">
+                <span class="grid-label">Target Position</span>
+                <span class="grid-value">{position_title}</span>
               </div>
-              <div class="info-row">
-                <strong style="color: #64748b;">Company</strong>
-                <span style="font-weight: 600; color: #0f172a;">{company_name or 'HireHand AI'}</span>
+              <div class="grid-row">
+                <span class="grid-label">Organization</span>
+                <span class="grid-value">{company_name or 'HireHand AI Workspace'}</span>
+              </div>
+              <div class="grid-row">
+                <span class="grid-label">Document Type</span>
+                <span class="grid-value" style="color: #4f46e5;">PDF Report (Attached)</span>
               </div>
             </div>
 
-            {f'<div class="message-box">{message_body}</div>' if message_body else ''}
+            {f'<div class="message-box"><strong>Note from Recruiter:</strong><br/><br/>{message_body}</div>' if message_body else ''}
 
-            <div style="text-align: center;">
-              <span class="sender-pill">Sent securely by {sender_name} ({sender_email})</span>
+            <div class="cta-area">
+              <div class="cta-text">This report contains sensitive candidate evaluation data.</div>
+              <span class="sender-pill">Sent securely on behalf of {sender_name} ({sender_email})</span>
             </div>
           </div>
           <div class="footer">
-            <p style="margin: 0;">This report is strictly confidential and intended only for the recipient.</p>
-            <p style="margin: 8px 0 0 0;">Powered by <strong>HireHand AI Analytics</strong></p>
+            <p style="margin: 0; line-height: 1.5;">CONFIDENTIALITY NOTICE: This report and its attachments are confidential and intended solely for authorized personnel.</p>
+            <div class="brand-text">Powered by HireHand AI Assessment Engine</div>
           </div>
         </div>
       </body>
