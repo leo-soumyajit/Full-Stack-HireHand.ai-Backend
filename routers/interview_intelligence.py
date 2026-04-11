@@ -20,8 +20,19 @@ from models.interview_analysis import (
 )
 from core.deps import get_current_user
 from core.interview_intelligence import run_full_analysis_pipeline
+from core.resend_email import send_interview_report_email
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
+
+class SendReportRequest(BaseModel):
+    to_email: EmailStr
+    subject: str = ""
+    message_body: str = ""
+    sender_name: str
+    sender_email: str
+    company_name: str = ""
+    pdf_base64: str
 
 
 def _build_jd_text(position: dict) -> str:
@@ -333,3 +344,42 @@ async def retry_analysis(
         "status": "processing",
         "message": "Analysis retry started.",
     }
+
+
+@router.post("/{analysis_id}/send-report")
+async def send_analysis_report(
+    analysis_id: str,
+    payload: SendReportRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate and send PDF report via email using Resend."""
+    try:
+        doc = await interview_analyses_collection.find_one({
+            "_id": ObjectId(analysis_id),
+            "user_id": current_user["id"],
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid analysis ID")
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    pdf_base64 = payload.pdf_base64
+    if pdf_base64.startswith("data:application/pdf;base64,"):
+        pdf_base64 = pdf_base64.split("data:application/pdf;base64,")[1]
+
+    try:
+        send_interview_report_email(
+            to_email=payload.to_email,
+            subject=payload.subject,
+            message_body=payload.message_body,
+            candidate_name=doc.get("candidate_name", "Candidate"),
+            position_title=doc.get("position_title", "Position"),
+            sender_name=payload.sender_name,
+            sender_email=payload.sender_email,
+            company_name=payload.company_name,
+            pdf_base64=pdf_base64
+        )
+        return {"message": "Report sent successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

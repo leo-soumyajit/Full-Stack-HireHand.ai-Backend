@@ -239,3 +239,104 @@ def send_rejection_email(to_email: str, candidate_name: str, position_title: str
         print(f'✅ Resend: Rejection email sent to {to_email}')
     except Exception as e:
         print(f'❌ Resend: Failed to send rejection email: {e}')
+
+def send_interview_report_email(
+    to_email: str,
+    subject: str,
+    message_body: str,
+    candidate_name: str,
+    position_title: str,
+    sender_name: str,
+    sender_email: str,
+    company_name: str,
+    pdf_base64: str
+):
+    """
+    Sends an Interview Intelligence report as a PDF attachment with a customized HTML body.
+    """
+    if not RESEND_API_KEY:
+        print(f"⚠️ [WARNING] RESEND_API_KEY not found. Fake-sent Report to {to_email}")
+        return
+
+    # User wanted a specific email sender for reports
+    REPORTS_FROM_EMAIL = os.getenv("RESEND_REPORTS_EMAIL", "HireHand Reports <reports@soumyajitbanerjee.in>")
+
+    # Render a premium Animated HTML email
+    html_content = f"""
+    <html>
+      <head>
+        <style>
+          body {{ font-family: 'Inter', Helvetica, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #334155; }}
+          .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #f1f5f9; }}
+          .header {{ background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); padding: 30px; text-align: center; color: white; }}
+          .header h1 {{ margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }}
+          .header p {{ margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }}
+          .content {{ padding: 40px 30px; }}
+          .info-card {{ background-color: #f1f5f9; border-radius: 12px; padding: 20px; margin-bottom: 30px; text-align: left; display: flex; flex-direction: column; gap: 10px; }}
+          .info-row {{ display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; font-size: 14px; }}
+          .info-row:last-child {{ border-bottom: none; padding-bottom: 0; }}
+          .message-box {{ background-color: #fef8eb; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 4px 12px 12px 4px; margin-bottom: 30px; font-size: 15px; line-height: 1.6; color: #78350f; white-space: pre-wrap; }}
+          .footer {{ background-color: #f8fafc; padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8; }}
+          .sender-pill {{ display: inline-block; background-color: #e0e7ff; color: #4338ca; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-top: 20px; }}
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Interview Intelligence Report</h1>
+            <p>AI-Generated Assessment & Insights</p>
+          </div>
+          <div class="content">
+            <p style="font-size: 16px; margin-top: 0;">Hi there,</p>
+            <p style="font-size: 16px; margin-bottom: 30px;">Attached is the detailed <strong>HireHand AI</strong> interview report for {candidate_name}.</p>
+            
+            <div class="info-card">
+              <div class="info-row">
+                <strong style="color: #64748b;">Candidate</strong>
+                <span style="font-weight: 600; color: #0f172a;">{candidate_name}</span>
+              </div>
+              <div class="info-row">
+                <strong style="color: #64748b;">Position</strong>
+                <span style="font-weight: 600; color: #0f172a;">{position_title}</span>
+              </div>
+              <div class="info-row">
+                <strong style="color: #64748b;">Company</strong>
+                <span style="font-weight: 600; color: #0f172a;">{company_name or 'HireHand AI'}</span>
+              </div>
+            </div>
+
+            {f'<div class="message-box">{message_body}</div>' if message_body else ''}
+
+            <div style="text-align: center;">
+              <span class="sender-pill">Sent securely by {sender_name} ({sender_email})</span>
+            </div>
+          </div>
+          <div class="footer">
+            <p style="margin: 0;">This report is strictly confidential and intended only for the recipient.</p>
+            <p style="margin: 8px 0 0 0;">Powered by <strong>HireHand AI Analytics</strong></p>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+
+    payload = {
+        "from": REPORTS_FROM_EMAIL,
+        "to": to_email,
+        "subject": subject or f"Confidential: Interview Report - {candidate_name} ({position_title})",
+        "html": html_content,
+        "attachments": [
+            {
+                "filename": f"Interview_Report_{candidate_name.replace(' ', '_')}.pdf",
+                "content": pdf_base64
+            }
+        ]
+    }
+
+    try:
+        r = resend.Emails.send(payload)
+        print(f'✅ Resend: Report email with PDF sent to {to_email}')
+        return r
+    except Exception as e:
+        print(f'❌ Resend: Failed to send report email: {e}')
+        raise e
