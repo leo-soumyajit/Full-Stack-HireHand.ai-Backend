@@ -581,6 +581,7 @@ General Rules:
 5. The options must be subtle; no obviously bad answers (except Math where one answer is correct).
 6. Each question must have a "trait_assessed" field describing what it evaluates.
 7. CRITICAL: The question text MUST be named exactly "scenario" in the JSON, even if it is a Math problem or a Direct question. Do NOT rename the key to "question" or "text".
+8. CRITICAL: DO NOT LEAK META-DATA. NEVER put the string ", correct: true" inside the actual "text" or "scenario" strings! The "correct": true flag must be a separate boolean key-value pair as a standard JSON property INSIDE the option object, NEVER embedded in the question text.
 
 Return ONLY valid JSON:
 {{

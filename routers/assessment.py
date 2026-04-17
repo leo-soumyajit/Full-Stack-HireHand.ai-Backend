@@ -8,6 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
+import re
 
 from database import (
     assessment_tests_collection,
@@ -87,12 +88,17 @@ async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict
         if "scenario" not in q:
             q["scenario"] = q.get("question") or q.get("text") or "Question text missing due to AI formatting error."
             
+        # Scrub AI metadata leaks from scenario text
+        if isinstance(q.get("scenario"), str):
+            q["scenario"] = re.sub(r',?\s*correct:\s*(true|false)\b', '', q["scenario"], flags=re.IGNORECASE).strip()
+            
         raw_options = q.get("options", [])
         sanitized_opts = []
         for i, opt in enumerate(raw_options):
             if isinstance(opt, str):
                 # AI returned a string instead of a dict
-                sanitized_opts.append({"id": ["A", "B", "C", "D"][i] if i < 4 else f"Opt-{i}", "text": opt})
+                opt_str = re.sub(r',?\s*correct:\s*(true|false)\b', '', opt, flags=re.IGNORECASE).strip()
+                sanitized_opts.append({"id": ["A", "B", "C", "D"][i] if i < 4 else f"Opt-{i}", "text": opt_str})
             elif isinstance(opt, dict):
                 if "text" not in opt and "id" in opt and len(opt["id"]) > 3:
                     # LLM accidentally put the option text in the "id" field
@@ -102,6 +108,11 @@ async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict
                     opt["id"] = ["A", "B", "C", "D"][i] if i < 4 else f"Opt-{i}"
                 if "text" not in opt:
                     opt["text"] = "Option text missing due to AI error."
+                
+                # Scrub AI metadata leaks from option text
+                if isinstance(opt.get("text"), str):
+                    opt["text"] = re.sub(r',?\s*correct:\s*(true|false)\b', '', opt["text"], flags=re.IGNORECASE).strip()
+                    
                 sanitized_opts.append(opt)
             else:
                 sanitized_opts.append({"id": ["A", "B", "C", "D"][i] if i < 4 else f"Opt-{i}", "text": "Invalid option format"})
