@@ -767,7 +767,8 @@ SCORING FORMULA — You MUST follow this process:
 4. composite_psych_score = round(weighted_avg × 10 + modifiers)
 5. The final composite_psych_score MUST be a single integer. DO NOT use 62, 68, 74, 75, or 76.
 6. Reference specific questions and response times in your interpretations.
-7. If {skipped_count} questions were skipped, this is a MAJOR negative signal."""
+7. If {skipped_count} questions were skipped, this is a MAJOR negative signal.
+8. CRITICAL: You MUST generate exactly ONE entry in the `trait_matrix` array for EVERY UNIQUE "Trait Assessed" present in the candidate's assessment journey below. Do not combine, skip, or omit any traits!"""
 
     return await _call_llm(system_prompt, user_prompt)
 
