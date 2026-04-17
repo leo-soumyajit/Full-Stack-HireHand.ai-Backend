@@ -44,7 +44,7 @@ async def _call_gemini(system_prompt: str, user_prompt: str, _retries: int = 3) 
 
     for attempt in range(1, _retries + 1):
         try:
-            async with httpx.AsyncClient(timeout=90.0) as client:
+            async with httpx.AsyncClient(timeout=150.0) as client:
                 resp = await client.post(
                     gemini_url,
                     json={
@@ -162,7 +162,7 @@ async def _call_openai_format(system_prompt: str, user_prompt: str, _retries: in
 
     for attempt in range(1, _retries + 1):
         try:
-            async with httpx.AsyncClient(timeout=90.0) as client:
+            async with httpx.AsyncClient(timeout=150.0) as client:
                 resp = await client.post(
                     AI_API_URL,
                     headers={

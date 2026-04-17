@@ -78,7 +78,8 @@ async def generate_assessment(req: GenerateAssessmentRequest, current_user: dict
     except ValueError as e:
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
+        print(f"\u26a0\ufe0f [Assessment] AI generation failed: {e}")
+        raise HTTPException(status_code=502, detail=f"AI generation failed: {str(e)[:200]}. Please try again.")
     
     # Sanitize AI output in case it messes up the schema
     for q in raw_test_data.get("questions", []):
