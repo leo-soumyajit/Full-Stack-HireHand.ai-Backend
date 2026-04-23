@@ -57,9 +57,11 @@ ROUTE_PERMISSIONS = [
 
     # ── Candidates ─────────────────────────────────────────────────
     ("POST",   r"^/api/positions/[^/]+/candidates$",   "manager"),   # add
+    ("POST",   r"^/api/positions/[^/]+/candidates/bulk-email$", "manager"), # bulk mail
     ("PATCH",  r"^/api/positions/candidates/.+$",      "manager"),   # update
     ("DELETE", r"^/api/positions/candidates/.+$",      "manager"),   # delete
-    ("GET",    r"^/api/positions/.+/candidates",       "viewer"),    # view
+    ("GET",    r"^/api/positions/.+/candidates",       "viewer"),    # view list
+    ("GET",    r"^/api/positions/candidates/.+",       "viewer"),    # view single
 
     # ── Assessments ────────────────────────────────────────────────
     ("POST",   r"^/api/assessment/generate$",          "manager"),   # generate
@@ -70,7 +72,7 @@ ROUTE_PERMISSIONS = [
 
     # ── Resume Screening ───────────────────────────────────────────
     ("POST",   r"^/api/positions/[^/]+/candidates/[^/]+/screen$", "manager"),
-    ("GET",    r"^/api/positions/[^/]+/screened-candidates$",     "viewer"),
+    ("GET",    r"^/api/positions/[^/]+/screened-resumes$",        "viewer"),
 
     # ── Psychometrics (EOS-IA) ─────────────────────────────────────
     ("POST",   r"^/api/psychometric/profile$",         "manager"),   # generate profile
