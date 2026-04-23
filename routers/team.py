@@ -124,7 +124,7 @@ async def list_team_members(current_user: dict = Depends(require_role("owner", "
     """List all team members in the same organization."""
     org_id = current_user.get("org_id")
     if not org_id:
-        return [_user_to_response(current_user | {"_id": ObjectId(current_user["id"])})]
+        return [_user_to_response(current_user | {"_id": ObjectId(current_user["self_id"])})]
 
     cursor = user_collection.find(
         {"org_id": org_id},
@@ -164,7 +164,7 @@ async def create_team_member(
     temp_password = _generate_temp_password()
     hashed_password = get_password_hash(temp_password)
 
-    org_id = current_user.get("org_id", current_user["id"])
+    org_id = current_user.get("org_id", current_user["self_id"])
 
     new_member = {
         "name": body.name,
@@ -172,7 +172,7 @@ async def create_team_member(
         "hashed_password": hashed_password,
         "role": body.role,
         "org_id": org_id,
-        "invited_by": current_user["id"],
+        "invited_by": current_user["self_id"],
         "company_name": current_user.get("company_name", ""),
         "company_domain": current_user.get("company_domain"),
         "company_logo": current_user.get("company_logo"),
@@ -224,7 +224,7 @@ async def update_member_role(
         raise HTTPException(status_code=404, detail="Team member not found")
 
     # Can't change your own role
-    if str(member["_id"]) == current_user["id"]:
+    if str(member["_id"]) == current_user["self_id"]:
         raise HTTPException(status_code=400, detail="You cannot change your own role.")
 
     # Can't modify the owner
@@ -236,7 +236,7 @@ async def update_member_role(
         raise HTTPException(status_code=403, detail="Only the owner can promote members to admin.")
 
     # Verify same org
-    if member.get("org_id") != current_user.get("org_id", current_user["id"]):
+    if member.get("org_id") != current_user.get("org_id", current_user["self_id"]):
         raise HTTPException(status_code=403, detail="This member does not belong to your organization.")
 
     await user_collection.update_one(
@@ -265,7 +265,7 @@ async def delete_team_member(
         raise HTTPException(status_code=404, detail="Team member not found")
 
     # Can't delete yourself
-    if str(member["_id"]) == current_user["id"]:
+    if str(member["_id"]) == current_user["self_id"]:
         raise HTTPException(status_code=400, detail="You cannot remove yourself from the team.")
 
     # Can't delete the owner
@@ -277,7 +277,7 @@ async def delete_team_member(
         raise HTTPException(status_code=403, detail="Only the owner can remove admin accounts.")
 
     # Verify same org
-    if member.get("org_id") != current_user.get("org_id", current_user["id"]):
+    if member.get("org_id") != current_user.get("org_id", current_user["self_id"]):
         raise HTTPException(status_code=403, detail="This member does not belong to your organization.")
 
     await user_collection.delete_one({"_id": member_oid})

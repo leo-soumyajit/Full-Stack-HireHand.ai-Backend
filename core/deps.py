@@ -29,5 +29,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    user["id"] = str(user.pop("_id"))
+    actual_user_id = str(user.pop("_id"))
+
+    # RBAC: Team members need to see the organization's data, not their own empty data.
+    # org_id for owner = their own _id. org_id for team members = the owner's _id.
+    # By using org_id as the effective "id", ALL existing router queries that filter
+    # by user_id automatically see the shared org data — zero router file changes needed.
+    org_id = user.get("org_id")
+    user["id"] = org_id if org_id else actual_user_id
+    user["self_id"] = actual_user_id  # Actual user ID for profile/auth/team ops
     return user
