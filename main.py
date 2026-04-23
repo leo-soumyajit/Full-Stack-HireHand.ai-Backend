@@ -3,7 +3,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from database import init_db
-from routers import auth, positions, candidates, psychometric, resume_screen, schedules, assessment, ai_tools, interview_intelligence, turn, live_transcript, deepgram_auth
+from routers import auth, positions, candidates, psychometric, resume_screen, schedules, assessment, ai_tools, interview_intelligence, turn, live_transcript, deepgram_auth, team
+from core.rbac import RBACMiddleware
 
 app = FastAPI(
     title="HireHand AI Backend",
@@ -18,6 +19,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# RBAC Middleware — enforces role permissions on ALL routes without touching any router
+app.add_middleware(RBACMiddleware)
 
 
 @app.on_event("startup")
@@ -54,6 +58,7 @@ app.include_router(interview_intelligence.router, prefix="/api/interview-intelli
 app.include_router(live_transcript.router, prefix="/api", tags=["Live Transcript"])
 app.include_router(deepgram_auth.router, prefix="/api/deepgram", tags=["Deepgram Auth"])
 app.include_router(turn.router, prefix="/api", tags=["TURN/ICE"])
+app.include_router(team.router, prefix="/api/team", tags=["Team Management"])
 
 
 @app.get("/")

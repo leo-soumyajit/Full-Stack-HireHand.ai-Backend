@@ -356,3 +356,54 @@ def send_interview_report_email(
     except Exception as e:
         print(f'❌ Resend: Failed to send report email: {e}')
         raise e
+
+
+def send_team_invite_email(to_email: str, member_name: str, inviter_name: str, company_name: str, role: str, temp_password: str):
+    """Send a team invitation email with temporary credentials."""
+    if not RESEND_API_KEY:
+        print(f"⚠️ [WARNING] RESEND_API_KEY not found. Fake-sent Team Invite to {to_email}")
+        return
+
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8080").rstrip("/")
+    login_url = f"{frontend_url}/login"
+
+    role_label = role.capitalize()
+
+    html_content = f"""
+    <html>
+      <body style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1a1a2e; background-color: #f8f9fc; margin: 0; padding: 20px;">
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+          <div style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 32px 24px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">Welcome to {company_name}</h1>
+            <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0 0; font-size: 14px;">You've been invited to join the team on HireHand AI</p>
+          </div>
+          <div style="padding: 32px 24px;">
+            <p>Hi <strong>{member_name}</strong>,</p>
+            <p><strong>{inviter_name}</strong> has invited you to join <strong>{company_name}</strong> as a <strong style="color: #4F46E5;">{role_label}</strong> on HireHand AI.</p>
+            <div style="background: #f0f0ff; padding: 20px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #4F46E5;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #666;">Your temporary login credentials:</p>
+              <p style="margin: 0 0 4px 0;"><strong>Email:</strong> {to_email}</p>
+              <p style="margin: 0;"><strong>Password:</strong> <code style="background: #e8e8f0; padding: 2px 8px; border-radius: 4px; font-size: 14px;">{temp_password}</code></p>
+            </div>
+            <p style="font-size: 13px; color: #e74c3c;">⚠️ Please change your password after your first login.</p>
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="{login_url}" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #fff; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; display: inline-block;">Login to HireHand</a>
+            </div>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #999; text-align: center;">This is an automated email from HireHand AI. If you didn't expect this invitation, please ignore this email.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+
+    try:
+        r = resend.Emails.send({
+            "from": RESEND_FROM_EMAIL,
+            "to": to_email,
+            "subject": f"You're invited to join {company_name} on HireHand AI",
+            "html": html_content
+        })
+        print(f"✅ Resend: Team invite email sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Resend: Failed to send team invite email: {e}")

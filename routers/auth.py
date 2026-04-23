@@ -90,7 +90,15 @@ async def signup(user: UserCreate):
         verification_otp=otp,
         otp_expires_at=expires_at
     )
-    result = await user_collection.insert_one(db_user.model_dump())
+    db_user_dict = db_user.model_dump()
+    result = await user_collection.insert_one(db_user_dict)
+
+    # RBAC: Set this user as owner of their own org
+    org_id = str(result.inserted_id)
+    await user_collection.update_one(
+        {"_id": result.inserted_id},
+        {"$set": {"role": "owner", "org_id": org_id}}
+    )
 
     # Send Notification Email asynchronously (or synchronously depending on the implementation)
     send_verification_email(user.email, otp, user.name)
@@ -135,7 +143,9 @@ async def verify_otp(body: VerifyOTPRequest):
         phone=user.get("phone"),
         bio=user.get("bio"),
         avatar_url=user.get("avatar_url"),
-        cover_url=user.get("cover_url")
+        cover_url=user.get("cover_url"),
+        role=user.get("role", "owner"),
+        org_id=user.get("org_id"),
     )
     return {"access_token": access_token, "token_type": "bearer", "user": user_response}
 
@@ -236,7 +246,9 @@ async def login(body: LoginRequest):
         company_name=user["company_name"], 
         company_domain=user.get("company_domain"),
         company_logo=user.get("company_logo"),
-        email=user["email"]
+        email=user["email"],
+        role=user.get("role", "owner"),
+        org_id=user.get("org_id"),
     )
     return {"access_token": access_token, "token_type": "bearer", "user": user_response}
 
@@ -259,7 +271,9 @@ async def login_oauth2(form_data: OAuth2PasswordRequestForm = Depends()):
         company_name=user["company_name"], 
         company_domain=user.get("company_domain"),
         company_logo=user.get("company_logo"),
-        email=user["email"]
+        email=user["email"],
+        role=user.get("role", "owner"),
+        org_id=user.get("org_id"),
     )
     return {"access_token": access_token, "token_type": "bearer", "user": user_response}
 

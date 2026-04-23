@@ -80,3 +80,14 @@ async def init_db():
     )
     if migrated_schedules.modified_count > 0 or migrated_analyses.modified_count > 0:
         print(f"📦 Migration: backfilled interview_round=1 → {migrated_schedules.modified_count} schedules, {migrated_analyses.modified_count} analyses")
+
+    # ── RBAC Migration: backfill role + org_id for existing users ──
+    await user_collection.create_index("org_id")
+    users_without_role = await user_collection.count_documents({"role": {"$exists": False}})
+    if users_without_role > 0:
+        async for user in user_collection.find({"role": {"$exists": False}}):
+            await user_collection.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"role": "owner", "org_id": str(user["_id"])}}
+            )
+        print(f"📦 RBAC Migration: backfilled role=owner + org_id for {users_without_role} existing users")

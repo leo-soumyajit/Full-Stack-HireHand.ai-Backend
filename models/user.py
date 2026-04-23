@@ -26,6 +26,11 @@ class UserInDB(BaseModel):
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
     cover_url: Optional[str] = None
+    # RBAC fields (additive — defaults keep backward compat)
+    role: str = "owner"
+    org_id: Optional[str] = None
+    invited_by: Optional[str] = None
+    created_at: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str
@@ -41,6 +46,9 @@ class UserResponse(BaseModel):
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
     cover_url: Optional[str] = None
+    # RBAC fields
+    role: str = "owner"
+    org_id: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str
