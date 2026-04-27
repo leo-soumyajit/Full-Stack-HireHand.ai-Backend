@@ -181,11 +181,11 @@ async def list_available_voices():
     """Return available TTS voices for HR to choose from."""
     return {
         "voices": [
-            {"key": "asteria", "name": "Asteria", "description": "Professional Female", "model": "aura-2-en-US-asteria"},
-            {"key": "luna", "name": "Luna", "description": "Warm Female", "model": "aura-2-en-US-luna"},
-            {"key": "stella", "name": "Stella", "description": "Clear Female", "model": "aura-2-en-US-stella"},
-            {"key": "orion", "name": "Orion", "description": "Professional Male", "model": "aura-2-en-US-orion"},
-            {"key": "arcas", "name": "Arcas", "description": "Warm Male", "model": "aura-2-en-US-arcas"},
+            {"key": "asteria", "name": "Asteria", "description": "Professional Female", "model": "aura-2-asteria-en"},
+            {"key": "luna", "name": "Luna", "description": "Warm Female", "model": "aura-2-luna-en"},
+            {"key": "stella", "name": "Stella", "description": "Clear Female", "model": "aura-2-stella-en"},
+            {"key": "orion", "name": "Orion", "description": "Professional Male", "model": "aura-2-orion-en"},
+            {"key": "arcas", "name": "Arcas", "description": "Warm Male", "model": "aura-2-arcas-en"},
         ]
     }
 

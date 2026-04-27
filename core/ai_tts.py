@@ -17,14 +17,14 @@ DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
 
 # Available Deepgram Aura voices
 AVAILABLE_VOICES = {
-    "asteria": "aura-2-en-US-asteria",      # Professional female
-    "luna": "aura-2-en-US-luna",             # Warm female
-    "stella": "aura-2-en-US-stella",         # Clear female
-    "orion": "aura-2-en-US-orion",           # Professional male
-    "arcas": "aura-2-en-US-arcas",           # Warm male
+    "asteria": "aura-2-asteria-en",      # Professional female
+    "luna": "aura-2-luna-en",             # Warm female
+    "stella": "aura-2-stella-en",         # Clear female
+    "orion": "aura-2-orion-en",           # Professional male
+    "arcas": "aura-2-arcas-en",           # Warm male
 }
 
-DEFAULT_VOICE = "aura-2-en-US-asteria"
+DEFAULT_VOICE = "aura-2-asteria-en"
 
 
 def get_voice_model(voice_key: str) -> str:
