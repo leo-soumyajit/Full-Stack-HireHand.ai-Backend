@@ -91,13 +91,19 @@ async def dispatch_ai_interview(
     if not position:
         raise HTTPException(status_code=404, detail="Position not found")
 
-    # 2. Check for existing active session
+    # 2. Check for existing active session (prevent duplicate dispatch)
     existing = await ai_interview_sessions_collection.find_one({
         "candidate_id": body.candidate_id,
         "position_id": body.position_id,
-        "round": body.round,
         "status": {"$in": ["pending", "in_progress"]},
     })
+    
+    # 3. Auto-compute interview round (L1, L2, L3...)
+    previous_count = await interview_analyses_collection.count_documents({
+        "candidate_id": body.candidate_id,
+        "position_id": body.position_id
+    })
+    calculated_round = previous_count + 1
     if existing:
         return {
             "message": "AI interview already dispatched for this round",
@@ -117,7 +123,7 @@ async def dispatch_ai_interview(
         "candidate_id": body.candidate_id,
         "position_id": body.position_id,
         "user_id": current_user["id"],
-        "round": body.round,
+        "round": calculated_round,
         "interview_type": body.interview_type,
         "max_questions": body.max_questions,
         "time_limit_minutes": body.time_limit_minutes,
@@ -159,10 +165,10 @@ async def dispatch_ai_interview(
     # 5. Update candidate stage
     await candidates_collection.update_one(
         {"_id": cand_oid},
-        {"$set": {"stage": f"AI Interview L{body.round} Pending"}}
+        {"$set": {"stage": f"AI Interview L{calculated_round} Pending"}}
     )
 
-    print(f"🤖 [AI-Interview] Dispatched for {candidate.get('name')} — {position.get('title')} (Round {body.round})")
+    print(f"🤖 [AI-Interview] Dispatched for {candidate.get('name')} — {position.get('title')} (Round {calculated_round})")
 
     return {
         "message": "AI Interview dispatched successfully",
