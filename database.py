@@ -29,6 +29,9 @@ schedules_collection = database.get_collection("schedules")
 # InterviewIQ — AI Interview Intelligence
 interview_analyses_collection = database.get_collection("interview_analyses")
 
+# AI Interview — Autonomous AI-conducted interviews
+ai_interview_sessions_collection = database.get_collection("ai_interview_sessions")
+
 
 async def init_db():
     """Create all indexes on startup for O(1) / low-latency queries."""
@@ -68,6 +71,11 @@ async def init_db():
     await interview_analyses_collection.create_index([("schedule_id", 1)], unique=True)
     await interview_analyses_collection.create_index([("position_id", 1), ("user_id", 1)])
     await interview_analyses_collection.create_index([("candidate_id", 1)])
+
+    # AI Interview Sessions
+    await ai_interview_sessions_collection.create_index("token", unique=True)
+    await ai_interview_sessions_collection.create_index([("candidate_id", 1), ("position_id", 1)])
+    await ai_interview_sessions_collection.create_index("status")
 
     # ── One-time migration: backfill interview_round for old data ──
     migrated_schedules = await schedules_collection.update_many(

@@ -92,6 +92,12 @@ ROUTE_PERMISSIONS = [
     # ── AI Tools ───────────────────────────────────────────────────
     ("POST",   r"^/api/ai",                            "manager"),
 
+    # ── AI Interview (Autonomous) ─────────────────────────────────
+    ("POST",   r"^/api/ai-interview/dispatch$",         "manager"),   # dispatch
+    ("GET",    r"^/api/ai-interview/voices/list$",      "viewer"),    # list voices
+    # GET /{token} and WebSocket /{token}/ws are public (candidate-facing)
+    # GET /{token}/status is protected by Depends(get_current_user) in the router
+
     # ── Candidate-facing assessment (public — no auth needed) ──────
     # These routes use skipAuth / no Depends(get_current_user), so middleware won't block them
 ]
@@ -133,6 +139,8 @@ PUBLIC_ROUTE_PATTERNS = [
     r"^/api/turn",                       # TURN/ICE servers
     r"^/api/live-transcript",            # WebSocket live transcript
     r"^/api/interview/.+",              # Interview room
+    r"^/api/ai-interview/[^/]+$",        # AI Interview — candidate token validation
+    r"^/api/ai-interview/[^/]+/ws$",     # AI Interview — WebSocket (candidate-facing)
 ]
 
 

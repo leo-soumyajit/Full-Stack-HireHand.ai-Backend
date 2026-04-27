@@ -407,3 +407,108 @@ def send_team_invite_email(to_email: str, member_name: str, inviter_name: str, c
         print(f"✅ Resend: Team invite email sent to {to_email}")
     except Exception as e:
         print(f"❌ Resend: Failed to send team invite email: {e}")
+
+
+def send_ai_interview_email(
+    to_email: str,
+    candidate_name: str,
+    position_title: str,
+    company_name: str,
+    interview_url: str,
+    interview_type: str = "hybrid",
+    time_limit: int = 20,
+):
+    """
+    Send an AI Interview invitation email to the candidate.
+    100% NEW function — does NOT modify any existing email template.
+    """
+    if not RESEND_API_KEY:
+        print(f"⚠️ [WARNING] RESEND_API_KEY not found. Fake-sent AI Interview Email to {to_email}")
+        print(f"   Link: {interview_url}")
+        return
+
+    company_display = company_name if company_name else "our team"
+
+    html_content = f"""
+    <html>
+      <body style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5;">
+        <div style="max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); padding: 30px 30px; text-align: center;">
+            <div style="font-size: 36px; margin-bottom: 8px;">🤖</div>
+            <h1 style="color: #fff; margin: 0; font-size: 22px; font-weight: 600;">AI Interview Invitation</h1>
+            <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0 0; font-size: 14px;">{position_title}</p>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 30px;">
+            <p style="font-size: 16px;">Dear <strong>{candidate_name}</strong>,</p>
+
+            <p>We're excited to invite you to an <strong>AI-powered interview</strong> for the <strong>{position_title}</strong> position at <strong>{company_display}</strong>.</p>
+
+            <div style="background: #f8f9ff; border: 1px solid #e0e7ff; border-radius: 10px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 0 0 10px 0; font-size: 14px; color: #6366f1; font-weight: 600;">📋 Interview Details</p>
+              <table style="width: 100%; font-size: 14px;">
+                <tr>
+                  <td style="padding: 4px 0; color: #666; width: 120px;">Format:</td>
+                  <td style="padding: 4px 0; font-weight: 500;">AI Voice Interview</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #666;">Duration:</td>
+                  <td style="padding: 4px 0; font-weight: 500;">~{time_limit} minutes</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #666;">Validity:</td>
+                  <td style="padding: 4px 0; font-weight: 500;">7 days from now</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="{interview_url}"
+                 style="display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(99,102,241,0.35);">
+                Start Your Interview →
+              </a>
+            </div>
+
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #92400e;">💡 Tips for a great experience</p>
+              <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #78350f;">
+                <li>Find a quiet place with minimal background noise</li>
+                <li>Use a stable internet connection</li>
+                <li>Allow microphone and camera access when prompted</li>
+                <li>Speak clearly and take your time with answers</li>
+                <li>You can take the interview anytime within 7 days</li>
+              </ul>
+            </div>
+
+            <p style="font-size: 14px; color: #666; margin-top: 25px;">
+              This interview is conducted by HireHand AI. Your responses will be recorded and evaluated by our intelligent assessment engine. The hiring team will review your results.
+            </p>
+
+            <p style="font-size: 14px; color: #666;">Best of luck! 🍀</p>
+            <p style="font-size: 14px; color: #888;">— The {company_display} Hiring Team via HireHand AI</p>
+          </div>
+
+          <!-- Footer -->
+          <div style="background: #f9fafb; padding: 15px 30px; text-align: center; border-top: 1px solid #f0f0f0;">
+            <p style="margin: 0; font-size: 11px; color: #aaa;">Powered by HireHand AI • This is an automated invitation</p>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+
+    try:
+        r = resend.Emails.send({
+            "from": RESEND_FROM_EMAIL,
+            "to": to_email,
+            "subject": f"🤖 AI Interview Invitation: {position_title}",
+            "html": html_content,
+        })
+        print(f"✅ Resend: AI Interview email sent to {to_email}")
+    except Exception as e:
+        print(f"❌ Resend: Failed to send AI interview email: {e}")
+
