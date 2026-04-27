@@ -76,11 +76,15 @@ async def create_schedule(
             )
 
     # 3. Auto-compute interview round (L1, L2, L3...) for this candidate
-    previous_count = await schedules_collection.count_documents({
+    from database import ai_interview_sessions_collection
+    previous_manual = await schedules_collection.count_documents({
         "candidate_id": body.candidate_id,
         "status": {"$ne": "Cancelled"},  # Don't count cancelled interviews
     })
-    interview_round = previous_count + 1  # 1st interview = L1, 2nd = L2, etc.
+    previous_ai = await ai_interview_sessions_collection.count_documents({
+        "candidate_id": body.candidate_id,
+    })
+    interview_round = previous_manual + previous_ai + 1  # 1st interview = L1, 2nd = L2, etc.
 
     # 4. Create Meeting Link & Email Action
     meet_id = str(uuid.uuid4())[:10]
