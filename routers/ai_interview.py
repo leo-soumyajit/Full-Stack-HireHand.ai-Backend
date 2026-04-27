@@ -236,6 +236,7 @@ async def get_ai_interview_info(token: str):
         "round": session.get("round", 1),
         "interview_type": session.get("interview_type", "hybrid"),
         "status": session.get("status", "pending"),
+        "voice": session.get("voice", "asteria"),
     }
 
 
