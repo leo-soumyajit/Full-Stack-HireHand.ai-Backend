@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from database import init_db
-from routers import auth, positions, candidates, psychometric, resume_screen, schedules, assessment, ai_tools, interview_intelligence, turn, live_transcript, deepgram_auth, team, ai_interview
+from routers import auth, positions, candidates, psychometric, resume_screen, schedules, assessment, ai_tools, interview_intelligence, turn, live_transcript, deepgram_auth, team, ai_interview, transcript_chat
 from core.rbac import RBACMiddleware
 
 app = FastAPI(
@@ -60,6 +60,7 @@ app.include_router(deepgram_auth.router, prefix="/api/deepgram", tags=["Deepgram
 app.include_router(turn.router, prefix="/api", tags=["TURN/ICE"])
 app.include_router(ai_interview.router, prefix="/api/ai-interview", tags=["AI Interview"])
 app.include_router(team.router, prefix="/api/team", tags=["Team Management"])
+app.include_router(transcript_chat.router, prefix="/api/insight-chat", tags=["HireHand Insight AI"])
 
 
 @app.get("/")
