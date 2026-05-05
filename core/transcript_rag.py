@@ -40,10 +40,7 @@ def _get_chroma():
     if _chroma_client is None:
         if not CHROMA_AVAILABLE:
             return None
-        _chroma_client = chromadb.Client(ChromaSettings(
-            chroma_db_impl="duckdb",
-            anonymized_telemetry=False,
-        ))
+        _chroma_client = chromadb.EphemeralClient()
     return _chroma_client
 
 
