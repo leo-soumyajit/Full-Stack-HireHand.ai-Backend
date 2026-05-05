@@ -17,6 +17,7 @@ try:
     CHROMA_AVAILABLE = True
 except ImportError:
     CHROMA_AVAILABLE = False
+    ChromaSettings = None
 
 from bson import ObjectId
 from database import (
@@ -39,7 +40,10 @@ def _get_chroma():
     if _chroma_client is None:
         if not CHROMA_AVAILABLE:
             return None
-        _chroma_client = chromadb.Client(ChromaSettings(anonymized_telemetry=False))
+        _chroma_client = chromadb.Client(ChromaSettings(
+            chroma_db_impl="duckdb",
+            anonymized_telemetry=False,
+        ))
     return _chroma_client
 
 
