@@ -40,7 +40,9 @@ def _get_chroma():
     if _chroma_client is None:
         if not CHROMA_AVAILABLE:
             return None
-        _chroma_client = chromadb.EphemeralClient()
+        _chroma_client = chromadb.EphemeralClient(
+            settings=ChromaSettings(anonymized_telemetry=False)
+        )
     return _chroma_client
 
 
@@ -234,16 +236,19 @@ def build_vector_index(candidate_id: str, chunks: list[dict]) -> Optional[object
 
     coll_name = _collection_name(candidate_id)
 
-    # Delete existing collection if it exists (rebuild with fresh data)
+    # Retrieve existing collection or create new one
     try:
-        client.delete_collection(coll_name)
+        collection = client.get_collection(coll_name)
+        # If collection exists and has documents, reuse it!
+        if collection.count() > 0:
+            return collection
     except Exception:
         pass
 
     if not chunks:
         return None
 
-    collection = client.create_collection(
+    collection = client.get_or_create_collection(
         name=coll_name,
         metadata={"hnsw:space": "cosine"},
     )
