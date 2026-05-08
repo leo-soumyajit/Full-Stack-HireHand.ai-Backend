@@ -152,17 +152,44 @@ def _extract_text_chunks(context: dict) -> list[dict]:
     # ── Position JD ──
     pos = context.get("position")
     if pos:
-        jd = pos.get("jd_analysis") or pos.get("jd_structured") or {}
+        # The actual JD field in MongoDB is "jd" (not "jd_analysis" or "jd_structured")
+        jd = pos.get("jd") or pos.get("jd_analysis") or pos.get("jd_structured") or {}
         chunks.append({"text": f"Position: {pos.get('title', '')}", "source": "position_title"})
         if isinstance(jd, dict):
+            # Purpose / Summary
+            if jd.get("purpose"):
+                chunks.append({"text": f"JD Purpose: {jd['purpose']}", "source": "jd_purpose"})
+            # Responsibilities
             if jd.get("responsibilities"):
-                for r in jd["responsibilities"][:8]:
+                for r in jd["responsibilities"][:10]:
                     chunks.append({"text": f"JD Responsibility: {r}", "source": "jd_responsibilities"})
+            # Education requirements
+            if jd.get("education"):
+                edu = jd["education"]
+                if isinstance(edu, list):
+                    for e in edu:
+                        chunks.append({"text": f"JD Education Requirement: {e}", "source": "jd_education"})
+                elif isinstance(edu, str):
+                    chunks.append({"text": f"JD Education Requirement: {edu}", "source": "jd_education"})
+            # Experience requirements
+            if jd.get("experience"):
+                exp = jd["experience"]
+                if isinstance(exp, list):
+                    for e in exp:
+                        chunks.append({"text": f"JD Experience Requirement: {e}", "source": "jd_experience"})
+                elif isinstance(exp, str):
+                    chunks.append({"text": f"JD Experience Requirement: {exp}", "source": "jd_experience"})
+            # Qualifications
             if jd.get("qualifications"):
                 for q in jd["qualifications"][:6]:
                     chunks.append({"text": f"JD Qualification: {q}", "source": "jd_qualifications"})
+            # Skills
             if jd.get("skills"):
-                chunks.append({"text": f"JD Required Skills: {', '.join(jd['skills'][:10])}", "source": "jd_skills"})
+                if isinstance(jd["skills"][0], str):
+                    for s in jd["skills"][:10]:
+                        chunks.append({"text": f"JD Required Skill: {s}", "source": "jd_skills"})
+                else:
+                    chunks.append({"text": f"JD Required Skills: {', '.join(str(s) for s in jd['skills'][:10])}", "source": "jd_skills"})
 
     # ── Manual Interview Analyses ──
     for analysis in context.get("manual_interviews", []):
