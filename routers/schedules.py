@@ -79,10 +79,12 @@ async def create_schedule(
     from database import ai_interview_sessions_collection
     previous_manual = await schedules_collection.count_documents({
         "candidate_id": body.candidate_id,
+        "position_id": body.position_id,
         "status": {"$ne": "Cancelled"},  # Don't count cancelled interviews
     })
     previous_ai = await ai_interview_sessions_collection.count_documents({
         "candidate_id": body.candidate_id,
+        "position_id": body.position_id,
     })
     interview_round = previous_manual + previous_ai + 1  # 1st interview = L1, 2nd = L2, etc.
 

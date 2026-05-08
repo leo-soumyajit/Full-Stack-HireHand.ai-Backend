@@ -101,10 +101,12 @@ async def dispatch_ai_interview(
     # 3. Auto-compute interview round (L1, L2, L3...)
     previous_manual = await schedules_collection.count_documents({
         "candidate_id": body.candidate_id,
+        "position_id": body.position_id,
         "status": {"$ne": "Cancelled"}
     })
     previous_ai = await ai_interview_sessions_collection.count_documents({
-        "candidate_id": body.candidate_id
+        "candidate_id": body.candidate_id,
+        "position_id": body.position_id,
     })
     calculated_round = previous_manual + previous_ai + 1
     if existing:
