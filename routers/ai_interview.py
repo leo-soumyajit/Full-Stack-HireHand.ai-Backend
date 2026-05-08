@@ -65,6 +65,9 @@ class DispatchAIInterviewRequest(BaseModel):
     max_questions: int = 10
     time_limit_minutes: int = 20
     voice: str = "asteria"           # HR-selected voice
+    scheduled_at: str = ""           # ISO datetime string — empty = immediate
+    link_expiry_hours: int = 168     # Link validity in hours (default 7 days = 168h)
+    hr_notes: str = ""               # Custom notes/instructions from HR for the candidate
 
 
 @router.post("/dispatch")
@@ -118,7 +121,15 @@ async def dispatch_ai_interview(
 
     # 3. Create session document
     magic_token = str(uuid.uuid4())
-    expiration = datetime.now(timezone.utc) + timedelta(days=7)
+    expiration = datetime.now(timezone.utc) + timedelta(hours=body.link_expiry_hours)
+
+    # Parse scheduled_at if provided
+    scheduled_at_dt = None
+    if body.scheduled_at and body.scheduled_at.strip():
+        try:
+            scheduled_at_dt = datetime.fromisoformat(body.scheduled_at.replace("Z", "+00:00"))
+        except Exception:
+            scheduled_at_dt = None
 
     # Resolve voice model
     voice_model = get_voice_model(body.voice)
@@ -136,6 +147,8 @@ async def dispatch_ai_interview(
         "voice_key": body.voice,
         "status": "pending",  # pending → in_progress → completed → analyzed
         "expires_at": expiration.isoformat(),
+        "scheduled_at": scheduled_at_dt.isoformat() if scheduled_at_dt else None,
+        "hr_notes": body.hr_notes.strip() if body.hr_notes else "",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "started_at": None,
         "completed_at": None,
@@ -153,6 +166,17 @@ async def dispatch_ai_interview(
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8080").rstrip("/")
     interview_url = f"{frontend_url}/ai-interview/{magic_token}"
 
+    # Compute human-readable expiry & schedule for email
+    expiry_display = f"{body.link_expiry_hours} hours" if body.link_expiry_hours < 48 else f"{body.link_expiry_hours // 24} days"
+    
+    # Format scheduled time for email (IST)
+    scheduled_display = ""
+    if scheduled_at_dt:
+        from datetime import timezone as tz
+        ist_tz = tz(timedelta(hours=5, minutes=30))
+        ist_dt = scheduled_at_dt.astimezone(ist_tz)
+        scheduled_display = ist_dt.strftime("%d %b %Y, %I:%M %p (IST)")
+
     try:
         send_ai_interview_email(
             to_email=candidate.get("email"),
@@ -162,6 +186,10 @@ async def dispatch_ai_interview(
             interview_url=interview_url,
             interview_type=body.interview_type,
             time_limit=body.time_limit_minutes,
+            max_questions=body.max_questions,
+            expiry_display=expiry_display,
+            scheduled_display=scheduled_display,
+            hr_notes=body.hr_notes.strip(),
         )
     except Exception as e:
         print(f"⚠️ [AI-Interview] Email send failed: {e}")

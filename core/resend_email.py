@@ -417,10 +417,14 @@ def send_ai_interview_email(
     interview_url: str,
     interview_type: str = "hybrid",
     time_limit: int = 20,
+    max_questions: int = 10,
+    expiry_display: str = "7 days",
+    scheduled_display: str = "",
+    hr_notes: str = "",
 ):
     """
     Send an AI Interview invitation email to the candidate.
-    100% NEW function — does NOT modify any existing email template.
+    Includes: schedule info, interview rules, link expiry, and HR notes.
     """
     if not RESEND_API_KEY:
         print(f"⚠️ [WARNING] RESEND_API_KEY not found. Fake-sent AI Interview Email to {to_email}")
@@ -428,6 +432,24 @@ def send_ai_interview_email(
         return
 
     company_display = company_name if company_name else "our team"
+
+    # Build schedule row
+    schedule_html = ""
+    if scheduled_display:
+        schedule_html = f"""
+                <tr>
+                  <td style="padding: 4px 0; color: #666;">Scheduled For:</td>
+                  <td style="padding: 4px 0; font-weight: 600; color: #4f46e5;">{scheduled_display}</td>
+                </tr>"""
+
+    # Build HR notes section
+    hr_notes_html = ""
+    if hr_notes:
+        hr_notes_html = f"""
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #22c55e; border-radius: 4px 8px 8px 4px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #166534;">📝 Note from the Hiring Team</p>
+              <p style="margin: 0; font-size: 14px; color: #15803d; line-height: 1.6; white-space: pre-wrap;">{hr_notes}</p>
+            </div>"""
 
     html_content = f"""
     <html>
@@ -447,20 +469,25 @@ def send_ai_interview_email(
 
             <p>We're excited to invite you to an <strong>AI-powered interview</strong> for the <strong>{position_title}</strong> position at <strong>{company_display}</strong>.</p>
 
+            <!-- Interview Details Card -->
             <div style="background: #f8f9ff; border: 1px solid #e0e7ff; border-radius: 10px; padding: 20px; margin: 20px 0;">
               <p style="margin: 0 0 10px 0; font-size: 14px; color: #6366f1; font-weight: 600;">📋 Interview Details</p>
               <table style="width: 100%; font-size: 14px;">
                 <tr>
-                  <td style="padding: 4px 0; color: #666; width: 120px;">Format:</td>
-                  <td style="padding: 4px 0; font-weight: 500;">AI Voice Interview</td>
-                </tr>
+                  <td style="padding: 4px 0; color: #666; width: 140px;">Format:</td>
+                  <td style="padding: 4px 0; font-weight: 500;">AI Voice Interview ({interview_type.replace('_', ' ').title()})</td>
+                </tr>{schedule_html}
                 <tr>
                   <td style="padding: 4px 0; color: #666;">Duration:</td>
                   <td style="padding: 4px 0; font-weight: 500;">~{time_limit} minutes</td>
                 </tr>
                 <tr>
-                  <td style="padding: 4px 0; color: #666;">Validity:</td>
-                  <td style="padding: 4px 0; font-weight: 500;">7 days from now</td>
+                  <td style="padding: 4px 0; color: #666;">Questions:</td>
+                  <td style="padding: 4px 0; font-weight: 500;">Up to {max_questions} questions</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #666;">Link Valid For:</td>
+                  <td style="padding: 4px 0; font-weight: 500; color: #dc2626;">{expiry_display}</td>
                 </tr>
               </table>
             </div>
@@ -473,14 +500,32 @@ def send_ai_interview_email(
               </a>
             </div>
 
+            {hr_notes_html}
+
+            <!-- Interview Rules -->
             <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 20px 0;">
-              <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #92400e;">💡 Tips for a great experience</p>
-              <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #78350f;">
-                <li>Find a quiet place with minimal background noise</li>
-                <li>Use a stable internet connection</li>
-                <li>Allow microphone and camera access when prompted</li>
-                <li>Speak clearly and take your time with answers</li>
-                <li>You can take the interview anytime within 7 days</li>
+              <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #92400e;">⚠️ Important Interview Rules</p>
+              <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #78350f; line-height: 1.8;">
+                <li><strong>Camera must be ON</strong> throughout the interview — your face will be monitored</li>
+                <li><strong>5 seconds of silence</strong> will cause the AI to move to the next question automatically</li>
+                <li><strong>Tab switching is tracked</strong> — switching tabs or windows will be recorded and flagged</li>
+                <li>Speak <strong>clearly and naturally</strong> — the AI transcribes your voice in real-time</li>
+                <li>You can take your time to think, but avoid long pauses beyond 5 seconds</li>
+                <li>Ensure a <strong>quiet environment</strong> with minimal background noise</li>
+                <li>Use a <strong>stable internet connection</strong> (WiFi recommended over mobile data)</li>
+                <li>Use <strong>Google Chrome or Microsoft Edge</strong> for the best experience</li>
+                <li>Allow <strong>microphone and camera access</strong> when prompted by the browser</li>
+              </ul>
+            </div>
+
+            <!-- Tips Section -->
+            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #0c4a6e;">💡 Tips for a Great Interview</p>
+              <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #075985; line-height: 1.8;">
+                <li>Practice speaking your answers out loud before starting</li>
+                <li>Structure your answers using the STAR method (Situation, Task, Action, Result)</li>
+                <li>Be specific — mention technologies, projects, and measurable outcomes</li>
+                <li>It's okay to ask the AI to repeat a question if you didn't hear it clearly</li>
               </ul>
             </div>
 
