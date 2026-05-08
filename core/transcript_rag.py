@@ -194,7 +194,14 @@ def _extract_text_chunks(context: dict) -> list[dict]:
     # ── Manual Interview Analyses ──
     for analysis in context.get("manual_interviews", []):
         round_num = analysis.get("interview_round", "?")
-        label = f"Manual Interview L{round_num}"
+        
+        # Add date to label to distinguish multiple interviews in the same round
+        date_str = ""
+        if analysis.get("created_at"):
+            ca = analysis["created_at"]
+            date_str = f" ({str(ca)[:10]})"
+            
+        label = f"Manual Interview L{round_num}{date_str}"
 
         if analysis.get("executive_summary"):
             chunks.append({"text": f"[{label}] Executive Summary: {analysis['executive_summary']}", "source": label})
@@ -223,7 +230,14 @@ def _extract_text_chunks(context: dict) -> list[dict]:
     # ── AI Interview Sessions ──
     for session in context.get("ai_interviews", []):
         round_num = session.get("round", "?")
-        label = f"AI Interview L{round_num}"
+        
+        # Add date to label to distinguish multiple interviews in the same round
+        date_str = ""
+        if session.get("created_at"):
+            ca = session["created_at"]
+            date_str = f" ({str(ca)[:10]})"
+            
+        label = f"AI Interview L{round_num}{date_str}"
 
         # Transcript entries — group into ~500 char chunks to handle long interviews
         entries = session.get("transcript_entries", [])
