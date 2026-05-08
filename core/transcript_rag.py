@@ -225,15 +225,26 @@ def _extract_text_chunks(context: dict) -> list[dict]:
         round_num = session.get("round", "?")
         label = f"AI Interview L{round_num}"
 
-        # Transcript entries
-        for entry in session.get("transcript_entries", []):
-            speaker = entry.get("speaker", "Unknown")
-            text = entry.get("text", "")
-            if text.strip():
-                chunks.append({"text": f"[{label}] {speaker}: {text}", "source": f"{label}_transcript"})
+        # Transcript entries — group into ~500 char chunks to handle long interviews
+        entries = session.get("transcript_entries", [])
+        if entries:
+            buffer = ""
+            for entry in entries:
+                speaker = entry.get("speaker", "Unknown")
+                text = entry.get("text", "").strip()
+                if not text:
+                    continue
+                line = f"{speaker}: {text}\n"
+                if len(buffer) + len(line) > 500:
+                    chunks.append({"text": f"[{label}] {buffer.strip()}", "source": f"{label}_transcript"})
+                    buffer = line
+                else:
+                    buffer += line
+            if buffer.strip():
+                chunks.append({"text": f"[{label}] {buffer.strip()}", "source": f"{label}_transcript"})
 
         # Full transcript fallback
-        if not session.get("transcript_entries") and session.get("transcript"):
+        if not entries and session.get("transcript"):
             transcript = session["transcript"]
             for i in range(0, len(transcript), 500):
                 chunk_text = transcript[i:i+500]
@@ -255,7 +266,8 @@ def _collection_name(candidate_id: str) -> str:
 def build_vector_index(candidate_id: str, chunks: list[dict]) -> Optional[object]:
     """
     Build an in-memory ChromaDB collection from text chunks.
-    Returns the collection object for querying.
+    Uses a content hash to detect when data has changed (e.g., new L2 interview added)
+    and automatically rebuilds the index.
     """
     client = _get_chroma()
     if client is None:
@@ -263,12 +275,19 @@ def build_vector_index(candidate_id: str, chunks: list[dict]) -> Optional[object
 
     coll_name = _collection_name(candidate_id)
 
-    # Retrieve existing collection or create new one
+    # Compute a hash of current data to detect changes
+    data_hash = hashlib.md5("".join(c["text"] for c in chunks).encode()).hexdigest()
+
+    # Check if cached collection is still valid
     try:
         collection = client.get_collection(coll_name)
-        # If collection exists and has documents, reuse it!
-        if collection.count() > 0:
+        cached_hash = collection.metadata.get("data_hash", "")
+        if collection.count() > 0 and cached_hash == data_hash:
+            # Data hasn't changed, reuse cached index
             return collection
+        else:
+            # Data changed (new interview added etc.) — delete and rebuild
+            client.delete_collection(coll_name)
     except Exception:
         pass
 
@@ -277,7 +296,7 @@ def build_vector_index(candidate_id: str, chunks: list[dict]) -> Optional[object
 
     collection = client.get_or_create_collection(
         name=coll_name,
-        metadata={"hnsw:space": "cosine"},
+        metadata={"hnsw:space": "cosine", "data_hash": data_hash},
     )
 
     # Add all chunks
@@ -399,7 +418,7 @@ async def generate_answer(
                     "model": CHATBOT_MODEL,
                     "messages": messages,
                     "temperature": 0.3,
-                    "max_tokens": 1024,
+                    "max_tokens": 2048,
                 },
             )
             response.raise_for_status()
@@ -454,7 +473,7 @@ async def ask_about_candidate(
         top_chunks = [{"text": c["text"], "source": c["source"], "relevance": 1.0} for c in chunks[:15]]
     else:
         # 4. Semantic search
-        top_chunks = query_vector_index(candidate_id, question, n_results=10)
+        top_chunks = query_vector_index(candidate_id, question, n_results=15)
 
     # 5. Generate answer
     answer = await generate_answer(
