@@ -809,6 +809,7 @@ OUTPUT REQUIREMENTS:
 - "experience": 6+ highly descriptive bullet points.
 - "responsibilities": 8-10 expansive, action-oriented bullet points.
 - "skills": 10+ specific hard and soft skills.
+- "non_negotiables": 2-4 absolute MUST-HAVE requirements that are critical dealbreakers for this role. These are the non-negotiable criteria that a candidate MUST meet — no exceptions. Examples: specific certifications, minimum years of experience, mandatory technologies, security clearances, etc. Be very specific and role-relevant.
 
 Required JSON format:
 {{
@@ -816,7 +817,8 @@ Required JSON format:
   "education": ["string", "string"],
   "experience": ["string", "string"],
   "responsibilities": ["string", "string"],
-  "skills": ["string", "string"]
+  "skills": ["string", "string"],
+  "non_negotiables": ["string", "string"]
 }}"""
     user_prompt = f"Please modify the job description according to these instructions:\n\n{raw_jd}" if existing_jd else f"Please enhance and structure this raw Job Description:\n\n{raw_jd}"
     return await _call_llm(system_prompt, user_prompt)
@@ -832,8 +834,11 @@ Required JSON format:
   "education": ["string", "string"],
   "experience": ["string", "string"],
   "responsibilities": ["string", "string"],
-  "skills": ["string", "string"]
-}"""
+  "skills": ["string", "string"],
+  "non_negotiables": ["string", "string"]
+}
+
+IMPORTANT: The "non_negotiables" field must contain 2-4 absolute MUST-HAVE requirements that are critical dealbreakers for this role. These are the non-negotiable criteria that a candidate MUST meet — no exceptions. Examples: specific certifications, minimum years of experience, mandatory technologies, security clearances, etc. Be very specific and role-relevant."""
     user_prompt = f"Please completely restructure and enhance this raw Job Description into an elite format:\n\n{raw_jd}"
     return await _call_llm(system_prompt, user_prompt)
 

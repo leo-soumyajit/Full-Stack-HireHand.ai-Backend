@@ -30,6 +30,7 @@ class PositionJD(BaseModel):
     experience: List[str] = []
     responsibilities: List[str] = []
     skills: List[str] = []
+    non_negotiables: List[str] = []
 
 
 class JDVersion(BaseModel):
