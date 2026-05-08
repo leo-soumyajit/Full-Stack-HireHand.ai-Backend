@@ -254,6 +254,19 @@ async def get_ai_interview_info(token: str):
     if datetime.now(timezone.utc) > expires_at:
         raise HTTPException(status_code=400, detail="Interview link has expired")
 
+    # Check scheduled start time
+    if session.get("scheduled_at"):
+        scheduled_at = datetime.fromisoformat(session["scheduled_at"])
+        if datetime.now(timezone.utc) < scheduled_at:
+            from datetime import timezone as tz, timedelta
+            ist_tz = tz(timedelta(hours=5, minutes=30))
+            ist_dt = scheduled_at.astimezone(ist_tz)
+            formatted_time = ist_dt.strftime("%d %b %Y, %I:%M %p (IST)")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"This interview is scheduled for {formatted_time} and cannot be accessed yet. Please come back later."
+            )
+
     # Get position and candidate info
     try:
         position = await positions_collection.find_one({"_id": ObjectId(session["position_id"])})
@@ -425,6 +438,21 @@ async def ai_interview_websocket(websocket: WebSocket, token: str):
         await websocket.send_json({"type": "error", "message": "This interview has already been completed"})
         await websocket.close()
         return
+
+    # Check scheduled start time
+    if session.get("scheduled_at"):
+        scheduled_at = datetime.fromisoformat(session["scheduled_at"])
+        if datetime.now(timezone.utc) < scheduled_at:
+            from datetime import timezone as tz, timedelta
+            ist_tz = tz(timedelta(hours=5, minutes=30))
+            ist_dt = scheduled_at.astimezone(ist_tz)
+            formatted_time = ist_dt.strftime("%d %b %Y, %I:%M %p (IST)")
+            await websocket.send_json({
+                "type": "error", 
+                "message": f"This interview is scheduled for {formatted_time} and cannot be started yet."
+            })
+            await websocket.close()
+            return
 
     session_id = str(session["_id"])
 
