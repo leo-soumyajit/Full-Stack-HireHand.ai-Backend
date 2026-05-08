@@ -418,7 +418,7 @@ async def generate_answer(
                     "model": CHATBOT_MODEL,
                     "messages": messages,
                     "temperature": 0.3,
-                    "max_tokens": 2048,
+                    "max_tokens": 4096,
                 },
             )
             response.raise_for_status()
