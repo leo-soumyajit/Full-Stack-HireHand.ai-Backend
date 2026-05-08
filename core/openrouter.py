@@ -843,6 +843,46 @@ IMPORTANT: The "non_negotiables" field must contain 2-4 absolute MUST-HAVE requi
     return await _call_llm(system_prompt, user_prompt)
 
 
+async def generate_non_negotiables(role_title: str, level: str, jd_purpose: str, jd_skills: list, jd_experience: list, custom_instruction: str = "") -> dict:
+    """
+    Generate ONLY non-negotiable requirements for a JD.
+    Completely isolated — does NOT modify any other JD field.
+    """
+    system_prompt = """You are an elite HR Talent Intelligence system. Your ONLY task is to generate non-negotiable requirements for a specific role.
+
+Non-negotiables are absolute MUST-HAVE criteria that a candidate MUST meet — no exceptions. These are dealbreakers.
+Examples: mandatory certifications, minimum years of experience in specific technologies, required security clearances, regulatory compliance knowledge, etc.
+
+Rules:
+1. Generate exactly 3-5 non-negotiable requirements.
+2. Each must be specific, measurable, and directly tied to the role.
+3. Do NOT include generic soft skills (e.g., "good communication"). Only hard, verifiable requirements.
+4. If the user provides custom instructions, follow them to tailor the non-negotiables.
+
+Return ONLY valid JSON:
+{
+  "non_negotiables": ["requirement 1", "requirement 2", "requirement 3"]
+}"""
+
+    custom_block = f"\\n\\nHR CUSTOM INSTRUCTION: {custom_instruction}" if custom_instruction.strip() else ""
+
+    user_prompt = f"""Role: {role_title} | Level: {level}
+
+JD PURPOSE:
+{jd_purpose}
+
+KEY SKILLS:
+{', '.join(jd_skills[:15]) if jd_skills else 'Not specified'}
+
+EXPERIENCE REQUIREMENTS:
+{chr(10).join(f'- {e}' for e in jd_experience[:5]) if jd_experience else 'Not specified'}
+{custom_block}
+
+Generate the non-negotiable requirements for this role."""
+
+    return await _call_llm(system_prompt, user_prompt)
+
+
 async def generate_structured_interview_questions(
     job_description: str,
     role: str,

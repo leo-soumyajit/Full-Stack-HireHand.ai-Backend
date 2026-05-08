@@ -5,7 +5,8 @@ from core.openrouter import (
     generate_jd_questions,
     enhance_partial_jd,
     enhance_full_jd,
-    generate_structured_interview_questions
+    generate_structured_interview_questions,
+    generate_non_negotiables
 )
 
 router = APIRouter()
@@ -28,6 +29,14 @@ class InterviewQuestionsProps(BaseModel):
     category: str
     counts: Dict[str, int]  # e.g., {"easy": 1, "medium": 2, "hard": 1}
     existing_questions: Optional[List[Dict[str, Any]]] = None
+
+class NonNegotiablesProps(BaseModel):
+    role_title: str
+    level: str
+    jd_purpose: str = ""
+    jd_skills: List[str] = []
+    jd_experience: List[str] = []
+    custom_instruction: str = ""
 
 
 @router.post("/generate-questions-from-jd")
@@ -120,6 +129,33 @@ async def generate_interview(req: InterviewQuestionsProps):
             q["level"] = req.level
             
         return {"questions": questions_array}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
+
+
+@router.post("/generate-non-negotiables")
+async def generate_non_negotiables_endpoint(req: NonNegotiablesProps):
+    """Generate non-negotiable requirements for a position using AI."""
+    try:
+        if not req.role_title.strip():
+            raise HTTPException(status_code=400, detail="Role title is required")
+
+        result = await generate_non_negotiables(
+            role_title=req.role_title,
+            level=req.level,
+            jd_purpose=req.jd_purpose,
+            jd_skills=req.jd_skills,
+            jd_experience=req.jd_experience,
+            custom_instruction=req.custom_instruction,
+        )
+        non_neg = result.get("non_negotiables", [])
+        if not non_neg and isinstance(result, list):
+            non_neg = result
+        return {"non_negotiables": non_neg}
     except HTTPException:
         raise
     except ValueError as e:
