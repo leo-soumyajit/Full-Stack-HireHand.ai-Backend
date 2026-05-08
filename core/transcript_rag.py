@@ -479,15 +479,13 @@ async def ask_about_candidate(
             "chunks_used": 0,
         }
 
-    # 3. Build vector index
-    collection = build_vector_index(candidate_id, chunks)
-
-    if collection is None:
-        # Fallback: no ChromaDB, use all chunks as context directly
-        top_chunks = [{"text": c["text"], "source": c["source"], "relevance": 1.0} for c in chunks[:15]]
-    else:
-        # 4. Semantic search
-        top_chunks = query_vector_index(candidate_id, question, n_results=15)
+    # 3. Direct Context Injection (Bypassing ChromaDB)
+    # GPT-4o-mini supports 128k tokens. Our max chunks are usually < 30k tokens.
+    # We can feed ALL data directly, which eliminates OOM crashes on EC2 from ONNX models
+    # and provides 100% accurate context since nothing is filtered out by semantic search.
+    
+    # Cap at max 100 chunks just as a safety net (approx 50k tokens)
+    top_chunks = [{"text": c["text"], "source": c["source"], "relevance": 1.0} for c in chunks[:100]]
 
     # 5. Generate answer
     answer = await generate_answer(
