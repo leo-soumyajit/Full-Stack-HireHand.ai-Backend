@@ -2,12 +2,17 @@
 Resume Screening Models — EOS-IA AI Resume Intelligence
 """
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class SocialLinks(BaseModel):
     linkedin: Optional[str] = None
     github: Optional[str] = None
     portfolio: Optional[str] = None
+
+class NonNegotiableCheck(BaseModel):
+    requirement: str
+    met: bool
+    reason: str = ""
 
 class ResumeAnalysis(BaseModel):
     candidate_name: str
@@ -22,6 +27,7 @@ class ResumeAnalysis(BaseModel):
     verdict: str                        # STRONG FIT | POTENTIAL FIT | WEAK FIT | NOT SUITABLE
     verdict_rationale: str
     recommended_stage: str              # Screened | Interview L1 | Rejected
+    non_negotiables_check: List[NonNegotiableCheck] = []
 
 class ResumeScreenResponse(BaseModel):
     analysis: ResumeAnalysis

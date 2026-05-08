@@ -29,6 +29,7 @@ class InterviewQuestionsProps(BaseModel):
     category: str
     counts: Dict[str, int]  # e.g., {"easy": 1, "medium": 2, "hard": 1}
     existing_questions: Optional[List[Dict[str, Any]]] = None
+    non_negotiables: Optional[List[str]] = None
 
 class NonNegotiablesProps(BaseModel):
     role_title: str
@@ -109,7 +110,8 @@ async def generate_interview(req: InterviewQuestionsProps):
             easy=easy,
             medium=medium,
             hard=hard,
-            existing_questions=req.existing_questions
+            existing_questions=req.existing_questions,
+            non_negotiables=req.non_negotiables,
         )
         questions_array = result.get("questions", [])
         if not questions_array and isinstance(result, list):

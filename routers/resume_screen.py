@@ -118,6 +118,7 @@ async def screen_resume(
             level=pos.get("level", "Mid"),
             business_unit=pos.get("business_unit", "General"),
             custom_rules=pos.get("screening_rules"),
+            non_negotiables=jd.get("non_negotiables", []),
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI analysis failed: {str(e)}")

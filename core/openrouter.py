@@ -436,6 +436,7 @@ async def analyze_resume(
     level: str,
     business_unit: str,
     custom_rules: dict = None,
+    non_negotiables: list = None,
 ) -> dict:
     """
     AI Resume Screening — analyzes a resume against the position JD.
@@ -509,8 +510,31 @@ KEY RESPONSIBILITIES:
 
 EXPERIENCE REQUIREMENTS:
 {chr(10).join(f'- {e}' for e in jd_experience[:5])}
+"""
 
----
+    if non_negotiables and len(non_negotiables) > 0:
+        nn_list = chr(10).join(f'{i+1}. {req}' for i, req in enumerate(non_negotiables))
+        user_prompt += f"""
+⚠️ NON-NEGOTIABLE REQUIREMENTS (MUST CHECK EACH ONE):
+{nn_list}
+"""
+        system_prompt += f"""
+
+CRITICAL NON-NEGOTIABLE CHECK:
+The position has {len(non_negotiables)} non-negotiable requirements that are absolute dealbreakers.
+You MUST evaluate EACH one individually against the resume and include a "non_negotiables_check" array in your JSON response.
+
+For each non-negotiable, return:
+{{
+  "requirement": "The exact non-negotiable text",
+  "met": true/false,
+  "reason": "1 sentence explaining WHY this is met or not met, referencing specific resume content"
+}}
+
+IMPORTANT: If ANY non-negotiable is NOT MET, the candidate should NOT receive "STRONG FIT" verdict.
+Add the field to your JSON: "non_negotiables_check": [{{...}}, {{...}}]"""
+
+    user_prompt += f"""---
 CANDIDATE RESUME:
 {resume_text[:6000]}
 
@@ -891,7 +915,8 @@ async def generate_structured_interview_questions(
     easy: int,
     medium: int,
     hard: int,
-    existing_questions: list = None
+    existing_questions: list = None,
+    non_negotiables: list = None,
 ) -> dict:
     total = easy + medium + hard
     if total == 0:
@@ -918,6 +943,14 @@ Required format:
 }}"""
     if existing_questions:
         system_prompt += f"\n\nCRITICAL - DO NOT REPEAT: The following questions already exist: {[q.get('text') for q in existing_questions]!s}"
+
+    if non_negotiables and len(non_negotiables) > 0:
+        nn_text = chr(10).join(f'- {req}' for req in non_negotiables)
+        system_prompt += f"""\n\nNON-NEGOTIABLE REQUIREMENTS (HIGH PRIORITY):
+The position has the following non-negotiable dealbreaker requirements. At least 30-50% of your questions MUST directly probe these specific competencies:
+{nn_text}
+
+Ensure that the hardest questions specifically test these non-negotiable areas."""
 
     user_prompt = f"Generate exactly {total} {level} \"{category}\" interview questions ({easy} Easy, {medium} Medium, {hard} Hard) based on this Job Description for the \"{role}\" role:\n\n{job_description}"
     return await _call_llm(system_prompt, user_prompt)
