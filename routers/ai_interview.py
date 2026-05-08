@@ -50,6 +50,8 @@ def _build_jd_text(position: dict) -> str:
         parts.append("Qualifications:\n" + "\n".join(f"- {q}" for q in jd["qualifications"][:5]))
     if jd.get("skills"):
         parts.append("Skills:\n" + "\n".join(f"- {s}" for s in jd["skills"][:8]))
+    if jd.get("non_negotiables"):
+        parts.append("NON-NEGOTIABLE DEALBREAKERS (CRITICAL TO VERIFY):\n" + "\n".join(f"- {n}" for n in jd["non_negotiables"]))
     return "\n\n".join(parts) if parts else f"Role: {position.get('title', 'Unknown')}"
 
 
