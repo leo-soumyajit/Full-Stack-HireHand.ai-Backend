@@ -533,7 +533,7 @@ def send_ai_interview_email(
               This interview is conducted by HireHand AI. Your responses will be recorded and evaluated by our intelligent assessment engine. The hiring team will review your results.
             </p>
 
-            <p style="font-size: 14px; color: #666;">Best of luck! 🍀</p>
+            <p style="font-size: 14px; color: #666;">Best of luck for your interview! 🍀</p>
             <p style="font-size: 14px; color: #888;">— The {company_display} Hiring Team via HireHand AI</p>
           </div>
 
