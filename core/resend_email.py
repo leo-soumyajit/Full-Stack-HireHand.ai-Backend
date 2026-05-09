@@ -547,10 +547,13 @@ def send_ai_interview_email(
     """
 
     try:
+        # Generate a short unique ID from the interview url to prevent Gmail threading
+        unique_ref = interview_url.split('/')[-1][:6] if '/' in interview_url else "1A2B3C"
+        
         r = resend.Emails.send({
             "from": RESEND_FROM_EMAIL,
             "to": to_email,
-            "subject": f"🤖 AI Interview Invitation: {position_title}",
+            "subject": f"🤖 AI Interview Invitation: {position_title} (Ref: {unique_ref})",
             "html": html_content,
         })
         print(f"✅ Resend: AI Interview email sent to {to_email}")
