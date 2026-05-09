@@ -146,7 +146,6 @@ async def dispatch_ai_interview(
 
     # 3. Create session document
     magic_token = str(uuid.uuid4())
-    expiration = datetime.now(timezone.utc) + timedelta(hours=body.link_expiry_hours)
 
     # Parse scheduled_at if provided
     scheduled_at_dt = None
@@ -155,6 +154,12 @@ async def dispatch_ai_interview(
             scheduled_at_dt = datetime.fromisoformat(body.scheduled_at.replace("Z", "+00:00"))
         except Exception:
             scheduled_at_dt = None
+
+    # Compute expiration: from scheduled_at if scheduled, else from now
+    if scheduled_at_dt:
+        expiration = scheduled_at_dt + timedelta(hours=body.link_expiry_hours)
+    else:
+        expiration = datetime.now(timezone.utc) + timedelta(hours=body.link_expiry_hours)
 
     # Resolve voice model
     voice_model = get_voice_model(body.voice)
@@ -274,12 +279,8 @@ async def get_ai_interview_info(token: str):
     if session.get("status") == "analyzed":
         raise HTTPException(status_code=400, detail="This interview has already been completed and evaluated")
 
-    # Check expiry
-    expires_at = datetime.fromisoformat(session["expires_at"])
-    if datetime.now(timezone.utc) > expires_at:
-        raise HTTPException(status_code=400, detail="Interview link has expired")
-
-    # Check scheduled start time
+    # Check scheduled start time FIRST (before expiry check)
+    # If scheduled, candidate cannot access before start time
     if session.get("scheduled_at"):
         scheduled_at = datetime.fromisoformat(session["scheduled_at"])
         if datetime.now(timezone.utc) < scheduled_at:
@@ -289,8 +290,13 @@ async def get_ai_interview_info(token: str):
             formatted_time = ist_dt.strftime("%d %b %Y, %I:%M %p (IST)")
             raise HTTPException(
                 status_code=400, 
-                detail=f"This interview is scheduled for {formatted_time} and cannot be accessed yet. Please come back later."
+                detail=f"This interview is scheduled for {formatted_time} and cannot be accessed yet. Please come back at the scheduled time."
             )
+
+    # Check expiry (link validity window has passed)
+    expires_at = datetime.fromisoformat(session["expires_at"])
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="Interview link has expired")
 
     # Get position and candidate info
     try:
