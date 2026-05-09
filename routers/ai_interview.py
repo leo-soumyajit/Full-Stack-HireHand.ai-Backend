@@ -115,8 +115,31 @@ async def dispatch_ai_interview(
     })
     calculated_round = previous_manual + previous_ai + 1
     if existing:
+        # Re-send the invitation email so candidate gets a reminder
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8080").rstrip("/")
+        existing_url = f"{frontend_url}/ai-interview/{existing['token']}"
+        expiry_display = f"{body.link_expiry_hours} hours" if body.link_expiry_hours < 48 else f"{body.link_expiry_hours // 24} days"
+
+        try:
+            send_ai_interview_email(
+                to_email=candidate.get("email"),
+                candidate_name=candidate.get("name", "Candidate"),
+                position_title=position.get("title", "Position"),
+                company_name=current_user.get("company_name", ""),
+                interview_url=existing_url,
+                interview_type=body.interview_type,
+                time_limit=body.time_limit_minutes,
+                max_questions=body.max_questions,
+                expiry_display=expiry_display,
+                scheduled_display="",
+                hr_notes=body.hr_notes.strip() if body.hr_notes else "",
+            )
+            print(f"📧 [AI-Interview] Re-sent invitation email to {candidate.get('email')}")
+        except Exception as e:
+            print(f"⚠️ [AI-Interview] Re-send email failed: {e}")
+
         return {
-            "message": "AI interview already dispatched for this round",
+            "message": "AI interview already dispatched — invitation email re-sent",
             "token": existing["token"],
             "status": existing["status"],
         }
