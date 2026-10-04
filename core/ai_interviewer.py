@@ -131,9 +131,10 @@ async def call_llm(messages: list[dict], retries: int = 3) -> str:
                     },
                     json={
                         "model": INTERVIEW_AI_MODEL,
-                        "route": "fallback",
                         "messages": messages,
-                        "max_tokens": 300,  # Keep responses concise
+                        # Headroom for reasoning-model tokens; prompt still enforces
+                        # 2-3 sentence spoken answers, so visible output stays concise.
+                        "max_tokens": 1000,
                         "temperature": 0.7,  # Natural variation
                     },
                 )

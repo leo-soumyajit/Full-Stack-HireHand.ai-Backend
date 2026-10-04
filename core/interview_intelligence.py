@@ -36,7 +36,6 @@ async def _call_interview_llm(system_prompt: str, user_prompt: str, retries: int
                     },
                     json={
                         "model": INTERVIEW_AI_MODEL,
-                        "route": "fallback",
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},

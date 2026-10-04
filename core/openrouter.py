@@ -173,7 +173,6 @@ async def _call_openai_format(system_prompt: str, user_prompt: str, _retries: in
                     },
                     json={
                         "model": AI_MODEL,
-                        "route": "fallback", # Specific to OpenRouter but harmless for others
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
