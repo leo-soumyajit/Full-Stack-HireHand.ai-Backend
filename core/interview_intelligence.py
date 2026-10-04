@@ -18,10 +18,22 @@ INTERVIEW_AI_KEY = os.getenv("INTERVIEW_AI_KEY", "sk-or-v1-a32c4d635c81e7010e35f
 INTERVIEW_AI_MODEL = os.getenv("INTERVIEW_AI_MODEL", "openai/gpt-4o-mini")
 INTERVIEW_AI_URL = os.getenv("INTERVIEW_AI_URL", "https://openrouter.ai/api/v1/chat/completions")
 
+# The analysis pipeline fires 3 back-to-back LLM calls (parse → competencies →
+# reports). On Groq's free tier each account has its own per-minute token budget,
+# so each chain can use a SEPARATE account key to avoid tripping one account's
+# limit. All fall back to INTERVIEW_AI_KEY when the extra keys aren't configured.
+INTERVIEW_AI_KEY_2 = os.getenv("INTERVIEW_AI_KEY_2") or INTERVIEW_AI_KEY
+INTERVIEW_AI_KEY_3 = os.getenv("INTERVIEW_AI_KEY_3") or INTERVIEW_AI_KEY
 
-async def _call_interview_llm(system_prompt: str, user_prompt: str, retries: int = 3) -> dict:
-    """Call the dedicated interview AI with retry logic. Returns parsed JSON."""
+
+async def _call_interview_llm(system_prompt: str, user_prompt: str, retries: int = 3, api_key: str = None) -> dict:
+    """Call the dedicated interview AI with retry logic. Returns parsed JSON.
+
+    api_key lets each analysis chain use a different Groq account/key so the
+    back-to-back calls don't share one account's per-minute token limit.
+    """
     last_error = None
+    key = api_key or INTERVIEW_AI_KEY
 
     for attempt in range(1, retries + 1):
         try:
@@ -29,7 +41,7 @@ async def _call_interview_llm(system_prompt: str, user_prompt: str, retries: int
                 resp = await client.post(
                     INTERVIEW_AI_URL,
                     headers={
-                        "Authorization": f"Bearer {INTERVIEW_AI_KEY}",
+                        "Authorization": f"Bearer {key}",
                         "Content-Type": "application/json",
                         "HTTP-Referer": "https://hirehand.ai",
                         "X-Title": "HireHand InterviewIQ",
@@ -254,7 +266,7 @@ INTERVIEW Q&A:
 Analyze the candidate's competencies against this JD.
 REMINDER: Use ONLY verbatim quotes as evidence. Score 0 for anything not discussed. Do NOT fabricate or assume."""
 
-    return await _call_interview_llm(system_prompt, user_prompt)
+    return await _call_interview_llm(system_prompt, user_prompt, api_key=INTERVIEW_AI_KEY_2)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -393,7 +405,7 @@ FULL INTERVIEW Q&A:
 Generate all three reports (Interviewer Report, Candidate Feedback, Interviewer Quality Assessment).
 REMINDER: All evidence must be verbatim quotes. All scores must align with input competency data. Do NOT fabricate anything."""
 
-    return await _call_interview_llm(system_prompt, user_prompt)
+    return await _call_interview_llm(system_prompt, user_prompt, api_key=INTERVIEW_AI_KEY_3)
 
 
 # ══════════════════════════════════════════════════════════════════════
