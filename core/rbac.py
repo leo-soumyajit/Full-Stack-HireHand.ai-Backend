@@ -141,6 +141,9 @@ PUBLIC_ROUTE_PATTERNS = [
     r"^/api/interview/.+",              # Interview room
     r"^/api/ai-interview/[^/]+$",        # AI Interview — candidate token validation
     r"^/api/ai-interview/[^/]+/ws$",     # AI Interview — WebSocket (candidate-facing)
+    # ── Job Seeker Portal ──
+    r"^/api/seeker/auth",                # seeker signup/login/verify/reset (own auth)
+    r"^/api/jobs",                       # public job board (no login)
 ]
 
 

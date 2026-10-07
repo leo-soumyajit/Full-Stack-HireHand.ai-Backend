@@ -1,0 +1,16 @@
+services:
+  backend:
+    # Pull the prebuilt image from Docker Hub (built by GitHub Actions on push to main).
+    # No building on the server — much faster.
+    image: soumyajit2005/hirehand-backend:latest
+    container_name: hirehand_backend
+    restart: unless-stopped
+    # Bind to localhost only — Nginx on the host proxies public traffic.
+    # The container is NOT exposed directly to the internet.
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Persist uploaded resumes across container restarts / redeploys
+      - ./uploads:/app/uploads

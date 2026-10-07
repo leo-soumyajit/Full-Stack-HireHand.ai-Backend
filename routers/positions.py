@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import List
+from pydantic import BaseModel
 import random
 import string
 
+from core.embeddings import embed_text, job_to_text, embeddings_enabled
 from database import positions_collection, candidates_collection
 from models.position import (
     PositionCreate, PositionUpdate, PositionStatusUpdate,
@@ -40,6 +42,8 @@ def _doc_to_response(doc: dict) -> PositionResponse:
         shortlisted_count=doc.get("shortlisted_count", 0),
         risk_flag=doc.get("risk_flag"),
         risk_level=doc.get("risk_level"),
+        is_published=doc.get("is_published", False),
+        published_at=doc.get("published_at"),
         created_at=doc.get("created_at", ""),
         updated_at=doc.get("updated_at", ""),
     )
@@ -109,6 +113,49 @@ async def create_position(
     }
     result = await positions_collection.insert_one(doc)
     doc["_id"] = result.inserted_id
+    return _doc_to_response(doc)
+
+
+class PositionPublishUpdate(BaseModel):
+    is_published: bool
+
+
+@router.patch("/{position_id}/publish", response_model=PositionResponse)
+async def set_position_publish(
+    position_id: str,
+    body: PositionPublishUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Publish/unpublish a position to the public job board.
+    Publishing requires a saved JD and pre-computes its embedding for recommendations."""
+    try:
+        oid = ObjectId(position_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid position ID format")
+
+    doc = await positions_collection.find_one({"_id": oid, "user_id": current_user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Position not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    update: dict = {"is_published": body.is_published, "updated_at": now}
+
+    if body.is_published:
+        jd = doc.get("jd")
+        if not jd:
+            raise HTTPException(status_code=400, detail="Add a JD before publishing this job.")
+        update["published_at"] = doc.get("published_at") or now
+        # Pre-compute JD embedding for recommendations (best-effort)
+        if embeddings_enabled():
+            try:
+                vec = await embed_text(job_to_text(doc, jd))
+                if vec:
+                    update["jd_embedding"] = vec
+            except Exception as e:
+                print(f"⚠️ [positions] JD embedding failed: {e}")
+
+    await positions_collection.update_one({"_id": oid}, {"$set": update})
+    doc.update(update)
     return _doc_to_response(doc)
 
 

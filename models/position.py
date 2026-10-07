@@ -81,5 +81,7 @@ class PositionResponse(BaseModel):
     shortlisted_count: int = 0
     risk_flag: Optional[str] = None
     risk_level: Optional[str] = None
+    is_published: bool = False
+    published_at: Optional[str] = None
     created_at: str
     updated_at: str
