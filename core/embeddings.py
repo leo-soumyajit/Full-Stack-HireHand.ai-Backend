@@ -18,7 +18,9 @@ EMBEDDING_API_KEY = (
     or os.getenv("GEMINI_API_KEY")
     or ""
 )
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+# Default to gemini-embedding-001 (works with both AIza... and newer AQ... keys).
+# Override with EMBEDDING_MODEL if your key only has text-embedding-004.
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 _EMBED_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{EMBEDDING_MODEL}:embedContent"
 )
@@ -34,8 +36,15 @@ async def embed_text(text: str) -> Optional[List[float]]:
         return None
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
+            # Use X-goog-api-key header — works for both legacy (AIza...) and
+            # newer (AQ...) Google AI Studio key formats. ?key= query param
+            # only works for AIza... keys.
             resp = await client.post(
-                f"{_EMBED_URL}?key={EMBEDDING_API_KEY}",
+                _EMBED_URL,
+                headers={
+                    "X-goog-api-key": EMBEDDING_API_KEY,
+                    "Content-Type": "application/json",
+                },
                 json={
                     "model": f"models/{EMBEDDING_MODEL}",
                     "content": {"parts": [{"text": text[:9000]}]},
