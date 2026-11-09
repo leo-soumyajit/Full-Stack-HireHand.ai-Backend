@@ -105,6 +105,8 @@ class SeekerResponse(BaseModel):
     resume_url: Optional[str] = None
     has_resume: bool = False
     profile_complete: bool = False
+    saved_jobs: List[str] = []
+    dismissed_jobs: List[str] = []
 
 
 class SeekerToken(BaseModel):
@@ -150,6 +152,23 @@ class JobPublicResponse(BaseModel):
     applicant_count: int = 0
 
 
+class FactorScore(BaseModel):
+    score: int
+    weight: int
+    reason: Optional[str] = None
+    days_ago: Optional[int] = None
+    available: Optional[bool] = None
+
+
+class MatchBreakdown(BaseModel):
+    skills: FactorScore
+    semantic: FactorScore
+    experience: FactorScore
+    title: FactorScore
+    location: FactorScore
+    recency: FactorScore
+
+
 # ── Recommendations ─────────────────────────────────────────────────
 class RecommendationItem(BaseModel):
     job: JobPublicResponse
@@ -158,3 +177,18 @@ class RecommendationItem(BaseModel):
     missing_skills: List[str] = []
     reason: Optional[str] = None
     already_applied: bool = False
+    saved: bool = False
+    days_ago: Optional[int] = None
+    breakdown: Optional[MatchBreakdown] = None
+
+
+class ProfileStrengthTip(BaseModel):
+    field: str
+    label: str
+    points: int
+
+
+class ProfileStrengthResponse(BaseModel):
+    percent: int
+    tips: List[ProfileStrengthTip] = []
+    missing: List[ProfileStrengthTip] = []

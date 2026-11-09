@@ -15,8 +15,9 @@ import cloudinary.uploader
 from core.seeker_deps import get_current_seeker, serialize_seeker
 from core.seeker_ai import extract_profile_from_resume
 from core.embeddings import embed_text, profile_to_text
+from core.scoring import profile_strength
 from database import job_seekers_collection
-from models.job_seeker import SeekerProfileUpdate, SeekerResponse
+from models.job_seeker import SeekerProfileUpdate, SeekerResponse, ProfileStrengthResponse
 
 router = APIRouter()
 
@@ -140,6 +141,42 @@ async def upload_resume(payload: ResumeUploadRequest, seeker: dict = Depends(get
 
     updated = await job_seekers_collection.find_one({"email": seeker["email"]})
     return {"profile": serialize_seeker(updated), "parsed": bool(extracted)}
+
+
+@router.get("/profile/strength", response_model=ProfileStrengthResponse)
+async def get_profile_strength(seeker: dict = Depends(get_current_seeker)):
+    """Naukri-style profile completeness with tips to improve."""
+    return profile_strength(seeker)
+
+
+@router.post("/jobs/{job_id}/save")
+async def save_job(job_id: str, seeker: dict = Depends(get_current_seeker)):
+    """Bookmark a job for later."""
+    await job_seekers_collection.update_one(
+        {"email": seeker["email"]},
+        {"$addToSet": {"saved_jobs": job_id},
+         "$pull": {"dismissed_jobs": job_id}},
+    )
+    return {"saved": True, "job_id": job_id}
+
+
+@router.delete("/jobs/{job_id}/save")
+async def unsave_job(job_id: str, seeker: dict = Depends(get_current_seeker)):
+    await job_seekers_collection.update_one(
+        {"email": seeker["email"]}, {"$pull": {"saved_jobs": job_id}}
+    )
+    return {"saved": False, "job_id": job_id}
+
+
+@router.post("/jobs/{job_id}/dismiss")
+async def dismiss_job(job_id: str, seeker: dict = Depends(get_current_seeker)):
+    """Hide a job from recommendations ("Not interested")."""
+    await job_seekers_collection.update_one(
+        {"email": seeker["email"]},
+        {"$addToSet": {"dismissed_jobs": job_id},
+         "$pull": {"saved_jobs": job_id}},
+    )
+    return {"dismissed": True, "job_id": job_id}
 
 
 @router.post("/profile/avatar")

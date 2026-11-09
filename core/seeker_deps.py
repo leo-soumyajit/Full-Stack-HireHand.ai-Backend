@@ -67,4 +67,6 @@ def serialize_seeker(doc: dict) -> dict:
         "resume_url": doc.get("resume_url"),
         "has_resume": has_resume,
         "profile_complete": bool(skills and has_resume),
+        "saved_jobs": doc.get("saved_jobs") or [],
+        "dismissed_jobs": doc.get("dismissed_jobs") or [],
     }
