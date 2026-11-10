@@ -15,7 +15,7 @@ from typing import List
 
 from core.seeker_deps import get_current_seeker
 from core.embeddings import embeddings_enabled, embed_text, job_to_text, profile_to_text
-from core.scoring import compute_match
+from core.scoring import compute_match, is_relevant
 from core.seeker_ai import explain_matches
 from database import positions_collection, applications_collection
 from models.job_seeker import RecommendationItem, MatchBreakdown
@@ -69,6 +69,12 @@ async def get_recommendations(
                 )
 
         match = compute_match(seeker, seeker_vec, pos, jd, job_vec)
+        # Relevance gate — drop jobs that have no meaningful signal to this
+        # seeker (e.g. mechanical roles for a frontend engineer). This is
+        # what Naukri/LinkedIn do: never show off-domain jobs even if some
+        # weak factors (location/recency) push the raw score up a little.
+        if not is_relevant(match):
+            continue
         if match["match_percent"] < min_score:
             continue
         scored.append({"pos": pos, "pid": pid, "match": match})

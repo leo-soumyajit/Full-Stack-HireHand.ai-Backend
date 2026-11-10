@@ -168,6 +168,29 @@ def score_recency(published_at: Optional[str]) -> Tuple[float, int]:
     return 0.2, days
 
 
+# ── Relevance gate ─────────────────────────────────────────────────
+# Drop jobs with NO meaningful signal to this seeker. A chemistry-seeker
+# shouldn't see mechanical jobs; filter noise out before ranking.
+RELEVANCE_MIN_SKILLS = 25      # at least some overlap
+RELEVANCE_MIN_SEMANTIC = 55    # real semantic similarity
+RELEVANCE_MIN_TITLE = 35       # title token overlap
+RELEVANCE_MIN_OVERALL = 32     # catch-all floor
+
+
+def is_relevant(match: dict) -> bool:
+    """True if the job has at least one strong signal of relevance to the seeker."""
+    b = match.get("breakdown", {})
+    skills = (b.get("skills") or {}).get("score", 0)
+    semantic = (b.get("semantic") or {}).get("score", 0)
+    title = (b.get("title") or {}).get("score", 0)
+    return (
+        skills >= RELEVANCE_MIN_SKILLS
+        or semantic >= RELEVANCE_MIN_SEMANTIC
+        or title >= RELEVANCE_MIN_TITLE
+        or match.get("match_percent", 0) >= RELEVANCE_MIN_OVERALL
+    )
+
+
 # ── Composite ──────────────────────────────────────────────────────
 def compute_match(
     seeker: dict,
